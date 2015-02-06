@@ -7,7 +7,7 @@ int main() {
   //BtreeType_str stxbtree;
   //BtreeType_str::const_iterator stxbtree_keyIter;
 
-  int64_t memory;
+  int64_t memory = 0;
   AllocatorType *alloc = new AllocatorType(&memory);
 
   BtreeType_str_alloc *stxbtree = new BtreeType_str_alloc(std::less<std::string>(), (*alloc));

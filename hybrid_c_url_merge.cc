@@ -1,17 +1,13 @@
 #include "microbench.hh"
 
-int main() {
+int main(int argc, char *argv[]) {
+  int merge_threshold = atoi(argv[1]);
+  int merge_ratio = atoi(argv[2]);
   std::ifstream infile_load("workloads/loadc_url_1M.dat");
   std::ifstream infile_txn("workloads/txnsc_url_1M.dat");
 
-  //MapType_str stdmap;
-  //MapType_str::const_iterator stdmap_keyIter;
-
-  int64_t memory = 0;
-  AllocatorType *alloc = new AllocatorType(&memory);
-
-  MapType_str_alloc *stdmap = new MapType_str_alloc(std::less<std::string>(), (*alloc));
-  MapType_str_alloc::const_iterator stdmap_keyIter;
+  HybridType hybrid;
+  hybrid.setup(false, merge_threshold, merge_ratio);
 
   std::string op;
   std::string key;
@@ -27,7 +23,7 @@ int main() {
   int count = 0;
   uint64_t value = 0;
   //read init file
-  while ((count < LIMIT) && infile_txn.good()) {
+  while ((count < LIMIT-1) && infile_load.good()) {
     infile_load >> op >> key;
     if (op.compare(insert) != 0) {
       std::cout << "READING LOAD FILE FAIL!\n";
@@ -42,9 +38,12 @@ int main() {
   count = 0;
   double start_time = get_now();
   while (count < (int)init_keys.size()) {
-    std::pair<typename MapType_str_alloc::iterator, bool> retval =
-      stdmap->insert(std::pair<std::string, uint64_t>(init_keys[count], value));
-    if (retval.second == false) {
+  //while (count < 10000) {
+    //std::cout << "count = " << count << "\n";
+    uint64_t* value_ptr = &value;
+    if (!hybrid.put_uv((const char*)(init_keys[count].c_str()), init_keys[count].size(), (const char*)value_ptr, 8)) {
+      std::cout << init_keys[count] << "\n";
+      std::cout << count << "===========\n";
       std::cout << "LOAD FAIL!\n";
       return -1;
     }
@@ -54,8 +53,18 @@ int main() {
   double end_time = get_now();
 
   double tput = count / (end_time - start_time) / 1000000; //Mops/sec
+  double memory = (hybrid.memory_consumption() + 0.0) /1000000; //MB
+  /*
+  if (merge_threshold > LIMIT)
+    std::cout << "mt ";
+  else if (merge_threshold == LIMIT)
+    std::cout << "smt ";
+  else
+    std::cout << "hybrid ";
+  std::cout << "url " << "memory " << memory << "\n";
+  */
   //std::cout << tput << "\n";
-  std::cout << "stdmap " << "url " << "memory " << (memory + 0.0)/1000000 << "\n";
+  std::cout << merge_threshold << " " << merge_ratio << " " << "url " << "insert " << tput << "\n";
 
   //load txns
   count = 0;
@@ -76,18 +85,20 @@ int main() {
     count++;
   }
 
-  //READ
+  //DO TXNS
   start_time = get_now();
   int txn_num = 0;
   value = 0;
-  uint64_t sum;
   while ((txn_num < LIMIT) && (txn_num < (int)ops.size())) {
+    Str val;
     if (ops[txn_num] == 1) { //READ
-      stdmap_keyIter = stdmap->find(keys[txn_num]);
-      if (stdmap_keyIter == stdmap->end()) {
+      if (!hybrid.get((const char*)(keys[txn_num].c_str()), keys[txn_num].size(), val)) {
+	//std::cout << txn_num << "\n";
+	std::cout << keys[txn_num] << "\n";
+	std::cout << txn_num << "===========\n";
 	std::cout << "READ FAIL\n";
+	return -1;
       }
-      sum += stdmap_keyIter->second;
     }
     else {
       std::cout << "UNRECOGNIZED CMD!\n";
@@ -98,8 +109,17 @@ int main() {
   end_time = get_now();
 
   tput = txn_num / (end_time - start_time) / 1000000; //Mops/sec
-  std::cout << "stdmap " << "url " << "read " << (tput + (sum - sum)) << "\n";
+  /*
+  if (merge_threshold > LIMIT)
+    std::cout << "mt ";
+  else if (merge_threshold == LIMIT)
+    std::cout << "smt ";
+  else
+    std::cout << "hybrid ";
+  std::cout << "url " << "read " << tput << "\n";
+  */
   //std::cout << "time elapsed = " << (end_time - start_time) << "\n";
+  std::cout << merge_threshold << " " << merge_ratio << " " << "url " << "read " << tput << "\n";
 
   return 0;
 }

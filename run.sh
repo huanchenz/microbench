@@ -11,9 +11,20 @@ MERGE_RATIO_SMT=0
 
 OUTPUT_MICROBENCH="outputs/output_microbench.csv"
 OUTPUT_MT_VS_SMT="outputs/output_mt_vs_smt.csv"
+
 OUTPUT_MERGECOST_INT_TIMELINE="outputs/output_mergecost_int_timeline.csv"
 OUTPUT_MERGECOST_STR_TIMELINE="outputs/output_mergecost_str_timeline.csv"
+OUTPUT_MERGECOST_URL_TIMELINE="outputs/output_mergecost_url_timeline.csv"
+
+OUTPUT_MERGETIME_INT="outputs/output_mergetime_int.csv"
+OUTPUT_MERGETIME_STR="outputs/output_mergetime_str.csv"
+OUTPUT_MERGETIME_URL="outputs/output_mergetime_url.csv"
+
+OUTPUT_MERTE_CONST="outputs/output_merge_const.csv"
+OUTPUT_MERTE_RATIO="outputs/output_merge_ratio.csv"
+
 #OUTPUT_URL="outputs/output_url.csv"
+
 
 ./stdmap_a_int > $OUTPUT_MICROBENCH
 ./stxbtree_a_int >> $OUTPUT_MICROBENCH
@@ -62,4 +73,9 @@ OUTPUT_MERGECOST_STR_TIMELINE="outputs/output_mergecost_str_timeline.csv"
 
 ./merge_cost_int $MERGE_THRESHOLD $MERGE_RATIO > $OUTPUT_MERGECOST_INT_TIMELINE
 ./merge_cost_str $MERGE_THRESHOLD $MERGE_RATIO > $OUTPUT_MERGECOST_STR_TIMELINE
-./merge_cost_url $MERGE_THRESHOLD $MERGE_RATIO > $OUTPUT_MERGECOST_STR_TIMELINE
+./merge_cost_url $MERGE_THRESHOLD $MERGE_RATIO > $OUTPUT_MERGECOST_URL_TIMELINE
+
+./merge_time_int $MERGE_THRESHOLD $MERGE_RATIO > $OUTPUT_MERGETIME_INT
+./merge_time_str $MERGE_THRESHOLD $MERGE_RATIO > $OUTPUT_MERGETIME_STR
+./merge_time_url $MERGE_THRESHOLD $MERGE_RATIO > $OUTPUT_MERGETIME_URL
+
