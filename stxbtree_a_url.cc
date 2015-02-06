@@ -1,24 +1,18 @@
 #include "microbench.hh"
 
 int main() {
-  std::ifstream infile_load("workloads/loadc_int_1M.dat");
-  std::ifstream infile_txn("workloads/txnsc_int_1M.dat");
+  std::ifstream infile_load("workloads/loada_url_1M.dat");
+  std::ifstream infile_txn("workloads/txnsa_url_1M.dat");
 
-  //MapType stdmap;
-  //MapType::const_iterator stdmap_keyIter;
-
-  int64_t memory = 0;
-  AllocatorType *alloc = new AllocatorType(&memory);
-
-  MapType_alloc *stdmap = new MapType_alloc(std::less<uint64_t>(), (*alloc));
-  MapType_alloc::const_iterator stdmap_keyIter;
+  BtreeType_str stxbtree;
+  BtreeType_str::const_iterator stxbtree_keyIter;
 
   std::string op;
-  uint64_t key;
+  std::string key;
 
-  std::vector<uint64_t> init_keys;
+  std::vector<std::string> init_keys;
   std::vector<int> ops; //INSERT = 0, READ = 1, UPDATE = 2
-  std::vector<uint64_t> keys;
+  std::vector<std::string> keys;
 
   std::string insert("INSERT");
   std::string read("READ");
@@ -42,8 +36,8 @@ int main() {
   count = 0;
   double start_time = get_now();
   while (count < (int)init_keys.size()) {
-    std::pair<typename MapType_alloc::iterator, bool> retval =
-      stdmap->insert(std::pair<uint64_t, uint64_t>(init_keys[count], value));
+    std::pair<typename BtreeType_str::iterator, bool> retval =
+      stxbtree.insert(std::pair<std::string, uint64_t>(init_keys[count], value));
     if (retval.second == false) {
       std::cout << "LOAD FAIL!\n";
       return -1;
@@ -54,9 +48,7 @@ int main() {
   double end_time = get_now();
 
   double tput = count / (end_time - start_time) / 1000000; //Mops/sec
-  //std::cout << tput << "\n";
-  std::cout << "stdmap " << "int " << "memory " << ((memory + 0.0)/1000000) << "\n";
-  //std::cout << "stdmap " << "int " << "memory " << (memory + 0.0) << "\n";
+  std::cout << "stxbtree " << "url " << "insert " << tput << "\n";
 
   //load txns
   count = 0;
@@ -77,18 +69,22 @@ int main() {
     count++;
   }
 
-  //READ
+  //READ/UPDATE
   start_time = get_now();
   int txn_num = 0;
   value = 0;
-  uint64_t sum;
+  uint64_t sum = 0;
   while ((txn_num < LIMIT) && (txn_num < (int)ops.size())) {
     if (ops[txn_num] == 1) { //READ
-      stdmap_keyIter = stdmap->find(keys[txn_num]);
-      if (stdmap_keyIter == stdmap->end()) {
+      stxbtree_keyIter = stxbtree.find(keys[txn_num]);
+      if (stxbtree_keyIter == stxbtree.end()) {
 	std::cout << "READ FAIL\n";
       }
-      sum += stdmap_keyIter->second;
+      sum += stxbtree_keyIter->second;
+    }
+    else if (ops[txn_num] == 2) { //UPDATE
+      stxbtree[key] = value;
+      value++;
     }
     else {
       std::cout << "UNRECOGNIZED CMD!\n";
@@ -99,7 +95,7 @@ int main() {
   end_time = get_now();
 
   tput = txn_num / (end_time - start_time) / 1000000; //Mops/sec
-  std::cout << "stdmap " << "int " << "read " << (tput + (sum - sum)) << "\n";
+  std::cout << "stxbtree " << "url " << "read/update " << (tput + (sum - sum)) << "\n";
   //std::cout << "time elapsed = " << (end_time - start_time) << "\n";
 
   return 0;

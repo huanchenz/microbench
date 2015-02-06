@@ -20,18 +20,20 @@
 #define KEY_LEN_STR 32
 
 typedef AllocatorTracker<std::pair<const uint64_t, uint64_t> > AllocatorType;
+//typedef AllocatorTracker<std::pair<const std::string, uint64_t> > AllocatorType_str;
+typedef AllocatorTracker<std::pair<const std::string, uint64_t> > AllocatorType_str;
 
 typedef std::map<uint64_t, uint64_t> MapType;
 typedef std::map<uint64_t, uint64_t, std::less<uint64_t>, AllocatorType> MapType_alloc;
 
 typedef std::map<std::string, uint64_t> MapType_str;
-typedef std::map<std::string, uint64_t, std::less<std::string>, AllocatorType> MapType_str_alloc;
+typedef std::map<std::string, uint64_t, std::less<std::string>, AllocatorType_str> MapType_str_alloc;
 
 typedef stx::btree_map<uint64_t, uint64_t> BtreeType;
 typedef stx::btree_map<uint64_t, uint64_t, std::less<uint64_t>, stx::btree_default_map_traits<uint64_t, uint64_t>, AllocatorType> BtreeType_alloc;
 
 typedef stx::btree_map<std::string, uint64_t> BtreeType_str;
-typedef stx::btree_map<std::string, uint64_t, std::less<std::string>, stx::btree_default_map_traits<std::string, uint64_t>, AllocatorType> BtreeType_str_alloc;
+typedef stx::btree_map<std::string, uint64_t, std::less<std::string>, stx::btree_default_map_traits<std::string, uint64_t>, AllocatorType_str> BtreeType_str_alloc;
 
 typedef mt_index<Masstree::default_table> HybridType;
 

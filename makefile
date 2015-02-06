@@ -5,10 +5,10 @@ DEPSDIR := hybrid_index/.deps
 DEPCFLAGS = -MD -MF $(DEPSDIR)/$*.d -MP
 MEMMGR = -ltcmalloc_minimal
 
-all: stdmap_a_int stdmap_a_str stdmap_c_int stdmap_c_str stdmap_c_url stdmap_e_int stdmap_e_str stxbtree_a_int stxbtree_a_str stxbtree_c_int stxbtree_c_str stxbtree_c_url stxbtree_e_int stxbtree_e_str hybrid_a_int hybrid_a_str hybrid_c_int hybrid_c_str hybrid_c_url hybrid_e_int hybrid_e_str merge_cost_int merge_cost_str
+all: stdmap_a_int stdmap_a_str stdmap_a_url stdmap_c_int stdmap_c_str stdmap_c_url stdmap_e_int stdmap_e_str stdmap_e_url stxbtree_a_int stxbtree_a_str stxbtree_a_url stxbtree_c_int stxbtree_c_str stxbtree_c_url stxbtree_e_int stxbtree_e_str stxbtree_e_url hybrid_a_int hybrid_a_str hybrid_a_url hybrid_c_int hybrid_c_str hybrid_c_url hybrid_e_int hybrid_e_str hybrid_e_url merge_cost_int merge_cost_str merge_cost_url
 
-#all: hybrid_c_url
-#all: stdmap_c_int
+#all: hybrid_c_int
+#all: stdmap_c_str stdmap_c_int
 
 hiTest.o: hiTest.cc hybrid_index/config.h $(DEPSDIR)/stamp
 	$(CXX) $(CFLAGS) $(DEPCFLAGS) -include hybrid_index/config.h -c -o hiTest.o hiTest.cc
@@ -28,6 +28,12 @@ stdmap_a_str.o: stdmap_a_str.cc microbench.hh hybrid_index/config.h $(DEPSDIR)/s
 
 stdmap_a_str: stdmap_a_str.o hybrid_index/mtIndexAPI.a
 	$(CXX) $(CFLAGS) -o stdmap_a_str stdmap_a_str.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
+
+stdmap_a_url.o: stdmap_a_url.cc microbench.hh hybrid_index/config.h $(DEPSDIR)/stamp
+	$(CXX) $(CFLAGS) $(DEPCFLAGS) -include hybrid_index/config.h -c -o stdmap_a_url.o stdmap_a_url.cc
+
+stdmap_a_url: stdmap_a_url.o hybrid_index/mtIndexAPI.a
+	$(CXX) $(CFLAGS) -o stdmap_a_url stdmap_a_url.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
 # --------------------------------------------------------------------------------------------------------------------------------------------
 
 # stdmap ycsb C-------------------------------------------------------------------------------------------------------------------------------
@@ -62,6 +68,12 @@ stdmap_e_str.o: stdmap_e_str.cc microbench.hh hybrid_index/config.h $(DEPSDIR)/s
 
 stdmap_e_str: stdmap_e_str.o hybrid_index/mtIndexAPI.a
 	$(CXX) $(CFLAGS) -o stdmap_e_str stdmap_e_str.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
+
+stdmap_e_url.o: stdmap_e_url.cc microbench.hh hybrid_index/config.h $(DEPSDIR)/stamp
+	$(CXX) $(CFLAGS) $(DEPCFLAGS) -include hybrid_index/config.h -c -o stdmap_e_url.o stdmap_e_url.cc
+
+stdmap_e_url: stdmap_e_url.o hybrid_index/mtIndexAPI.a
+	$(CXX) $(CFLAGS) -o stdmap_e_url stdmap_e_url.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
 # --------------------------------------------------------------------------------------------------------------------------------------------
 
 # stxbtree ycsb A-----------------------------------------------------------------------------------------------------------------------------
@@ -76,6 +88,12 @@ stxbtree_a_str.o: stxbtree_a_str.cc microbench.hh stx/btree.h stx/btree_map.h hy
 
 stxbtree_a_str: stxbtree_a_str.o hybrid_index/mtIndexAPI.a
 	$(CXX) $(CFLAGS) -o stxbtree_a_str stxbtree_a_str.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
+
+stxbtree_a_url.o: stxbtree_a_url.cc microbench.hh stx/btree.h stx/btree_map.h hybrid_index/config.h $(DEPSDIR)/stamp
+	$(CXX) $(CFLAGS) $(DEPCFLAGS) -include hybrid_index/config.h -c -o stxbtree_a_url.o stxbtree_a_url.cc
+
+stxbtree_a_url: stxbtree_a_url.o hybrid_index/mtIndexAPI.a
+	$(CXX) $(CFLAGS) -o stxbtree_a_url stxbtree_a_url.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
 # --------------------------------------------------------------------------------------------------------------------------------------------
 
 # stxbtree ycsb C-----------------------------------------------------------------------------------------------------------------------------
@@ -110,6 +128,12 @@ stxbtree_e_str.o: stxbtree_e_str.cc microbench.hh stx/btree.h stx/btree_map.h hy
 
 stxbtree_e_str: stxbtree_e_str.o hybrid_index/mtIndexAPI.a
 	$(CXX) $(CFLAGS) -o stxbtree_e_str stxbtree_e_str.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
+
+stxbtree_e_url.o: stxbtree_e_url.cc microbench.hh stx/btree.h stx/btree_map.h hybrid_index/config.h $(DEPSDIR)/stamp
+	$(CXX) $(CFLAGS) $(DEPCFLAGS) -include hybrid_index/config.h -c -o stxbtree_e_url.o stxbtree_e_url.cc
+
+stxbtree_e_url: stxbtree_e_url.o hybrid_index/mtIndexAPI.a
+	$(CXX) $(CFLAGS) -o stxbtree_e_url stxbtree_e_url.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
 # --------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -125,6 +149,12 @@ hybrid_a_str.o: hybrid_a_str.cc microbench.hh hybrid_index/config.h $(DEPSDIR)/s
 
 hybrid_a_str: hybrid_a_str.o hybrid_index/mtIndexAPI.a
 	$(CXX) $(CFLAGS) -o hybrid_a_str hybrid_a_str.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
+
+hybrid_a_url.o: hybrid_a_url.cc microbench.hh hybrid_index/config.h $(DEPSDIR)/stamp
+	$(CXX) $(CFLAGS) $(DEPCFLAGS) -include hybrid_index/config.h -c -o hybrid_a_url.o hybrid_a_url.cc
+
+hybrid_a_url: hybrid_a_url.o hybrid_index/mtIndexAPI.a
+	$(CXX) $(CFLAGS) -o hybrid_a_url hybrid_a_url.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
 # --------------------------------------------------------------------------------------------------------------------------------------------
 
 # hybrid ycsb C-------------------------------------------------------------------------------------------------------------------------------
@@ -159,6 +189,12 @@ hybrid_e_str.o: hybrid_e_str.cc microbench.hh hybrid_index/config.h $(DEPSDIR)/s
 
 hybrid_e_str: hybrid_e_str.o hybrid_index/mtIndexAPI.a
 	$(CXX) $(CFLAGS) -o hybrid_e_str hybrid_e_str.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
+
+hybrid_e_url.o: hybrid_e_url.cc microbench.hh hybrid_index/config.h $(DEPSDIR)/stamp
+	$(CXX) $(CFLAGS) $(DEPCFLAGS) -include hybrid_index/config.h -c -o hybrid_e_url.o hybrid_e_url.cc
+
+hybrid_e_url: hybrid_e_url.o hybrid_index/mtIndexAPI.a
+	$(CXX) $(CFLAGS) -o hybrid_e_url hybrid_e_url.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
 # --------------------------------------------------------------------------------------------------------------------------------------------
 
 # cost of merge-------------------------------------------------------------------------------------------------------------------------------
@@ -173,7 +209,13 @@ merge_cost_str.o: merge_cost_str.cc microbench.hh hybrid_index/config.h $(DEPSDI
 
 merge_cost_str: merge_cost_str.o hybrid_index/mtIndexAPI.a
 	$(CXX) $(CFLAGS) -o merge_cost_str merge_cost_str.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
+
+merge_cost_url.o: merge_cost_url.cc microbench.hh hybrid_index/config.h $(DEPSDIR)/stamp
+	$(CXX) $(CFLAGS) $(DEPCFLAGS) -include hybrid_index/config.h -c -o merge_cost_url.o merge_cost_url.cc
+
+merge_cost_url: merge_cost_url.o hybrid_index/mtIndexAPI.a
+	$(CXX) $(CFLAGS) -o merge_cost_url merge_cost_url.o hybrid_index/mtIndexAPI.a $(MEMMGR) -lpthread -lm
 # --------------------------------------------------------------------------------------------------------------------------------------------
 
 clean:
-	$(RM) stdmap_a_int stdmap_a_str stdmap_c_int stdmap_c_str stdmap_c_url stdmap_e_int stdmap_e_str stxbtree_a_int stxbtree_a_str stxbtree_c_int stxbtree_c_str stxbtree_c_url stxbtree_e_int stxbtree_e_str hybrid_a_int hybrid_a_str hybrid_c_int hybrid_c_str hybrid_c_url hybrid_e_int hybrid_e_str merge_cost_int merge_cost_str *.o *~
+	$(RM) stdmap_a_int stdmap_a_str stdmap_a_url stdmap_c_int stdmap_c_str stdmap_c_url stdmap_e_int stdmap_e_str stdmap_e_url stxbtree_a_int stxbtree_a_str stxbtree_a_url stxbtree_c_int stxbtree_c_str stxbtree_c_url stxbtree_e_int stxbtree_e_str stxbtree_e_url hybrid_a_int hybrid_a_str hybrid_a_url hybrid_c_int hybrid_c_str hybrid_c_url hybrid_e_int hybrid_e_str hybrid_e_url merge_cost_int merge_cost_str merge_cost_url *.o *~

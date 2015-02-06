@@ -13,7 +13,7 @@ OUTPUT_MICROBENCH="outputs/output_microbench.csv"
 OUTPUT_MT_VS_SMT="outputs/output_mt_vs_smt.csv"
 OUTPUT_MERGECOST_INT_TIMELINE="outputs/output_mergecost_int_timeline.csv"
 OUTPUT_MERGECOST_STR_TIMELINE="outputs/output_mergecost_str_timeline.csv"
-OUTPUT_URL="outputs/output_url.csv"
+#OUTPUT_URL="outputs/output_url.csv"
 
 ./stdmap_a_int > $OUTPUT_MICROBENCH
 ./stxbtree_a_int >> $OUTPUT_MICROBENCH
@@ -36,17 +36,30 @@ OUTPUT_URL="outputs/output_url.csv"
 ./stxbtree_e_str >> $OUTPUT_MICROBENCH
 ./hybrid_e_str $MERGE_THRESHOLD $MERGE_RATIO >> $OUTPUT_MICROBENCH
 
+./stdmap_a_url >> $OUTPUT_MICROBENCH
+./stxbtree_a_url>> $OUTPUT_MICROBENCH
+./hybrid_a_url $MERGE_THRESHOLD $MERGE_RATIO >> $OUTPUT_MICROBENCH
+./stdmap_c_url >> $OUTPUT_MICROBENCH
+./stxbtree_c_url >> $OUTPUT_MICROBENCH
+./hybrid_c_url $MERGE_THRESHOLD $MERGE_RATIO >> $OUTPUT_MICROBENCH
+./stdmap_e_url >> $OUTPUT_MICROBENCH
+./stxbtree_e_url >> $OUTPUT_MICROBENCH
+./hybrid_e_url $MERGE_THRESHOLD $MERGE_RATIO >> $OUTPUT_MICROBENCH
+
 
 ./hybrid_c_int $MERGE_THRESHOLD_MT $MERGE_RATIO_MT > $OUTPUT_MT_VS_SMT
 ./hybrid_c_int $MERGE_THRESHOLD_SMT $MERGE_RATIO_SMT >> $OUTPUT_MT_VS_SMT
 ./hybrid_c_str $MERGE_THRESHOLD_MT $MERGE_RATIO_MT >> $OUTPUT_MT_VS_SMT
 ./hybrid_c_str $MERGE_THRESHOLD_SMT $MERGE_RATIO_SMT >> $OUTPUT_MT_VS_SMT
+./hybrid_c_url $MERGE_THRESHOLD_MT $MERGE_RATIO_MT >> $OUTPUT_MT_VS_SMT
+./hybrid_c_url $MERGE_THRESHOLD_SMT $MERGE_RATIO_SMT >> $OUTPUT_MT_VS_SMT
 
-./stdmap_c_url $MERGE_THRESHOLD $MERGE_RATIO > $OUTPUT_URL
-./stxbtree_c_url $MERGE_THRESHOLD $MERGE_RATIO >> $OUTPUT_URL
-./hybrid_c_url $MERGE_THRESHOLD_MT $MERGE_RATIO_MT >> $OUTPUT_URL
-./hybrid_c_url $MERGE_THRESHOLD_SMT $MERGE_RATIO_SMT >> $OUTPUT_URL
+#./stdmap_c_url > $OUTPUT_URL
+#./stxbtree_c_url >> $OUTPUT_URL
+#./hybrid_c_url $MERGE_THRESHOLD_MT $MERGE_RATIO_MT >> $OUTPUT_URL
+#./hybrid_c_url $MERGE_THRESHOLD_SMT $MERGE_RATIO_SMT >> $OUTPUT_URL
 
 
 ./merge_cost_int $MERGE_THRESHOLD $MERGE_RATIO > $OUTPUT_MERGECOST_INT_TIMELINE
 ./merge_cost_str $MERGE_THRESHOLD $MERGE_RATIO > $OUTPUT_MERGECOST_STR_TIMELINE
+./merge_cost_url $MERGE_THRESHOLD $MERGE_RATIO > $OUTPUT_MERGECOST_STR_TIMELINE

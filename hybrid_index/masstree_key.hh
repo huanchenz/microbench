@@ -246,10 +246,13 @@ template <typename I> constexpr int key<I>::ikey_size;
 template <typename P>
 inline int key_compare(const Masstree::key<typename P::ikey_type>& a, Masstree::massnode<P>& b, int bp)
 {
+
   int cmp = a.compare_ikey(b.ikey(bp));
   if (cmp == 0)
-    a.compare_len(b.get_keylenx()[bp]);
+    return a.compare_len(b.get_keylenx()[bp]);
   return cmp;
+
+  //return a.compare(b.ikey(bp), b.get_keylenx()[bp]);
 }
 //huanchen-static-multivalue
 template <typename P>

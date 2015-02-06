@@ -1384,7 +1384,7 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
   n_ = t.n;
   */
   if (t.m == NULL) {
-    std::cout << "ERROR: merge_node, node m or n is NULL!!!\n";
+    std::cout << "ERROR: merge_node, node m is NULL!!!\n";
     return false;
   }
   m_ = t.m;
@@ -1403,26 +1403,6 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
   int m_nkeys = m_->size();
   int n_nkeys = n_->size();
   int new_max_nkeys = m_nkeys + n_nkeys;
-
-  for (int i = 0; i < n_nkeys; i++) {
-    if (n_->ksuf_offset(i+1) < n_->ksuf_offset(i)) {
-      std::cout << "ERROR2\n";
-      std::cout << n_->ksuf_offset(i+1) << "\n";
-      std::cout << n_->ksuf_offset(i) << "\n";
-      std::cout << "n_nkeys = " << n_nkeys << "\n";
-      std::cout << "n_size = " << n_size << "\n";
-    }
-  }
-
-  for (int i = 0; i < m_nkeys; i++) {
-    if (m_->ksuf_offset(i+1) < m_->ksuf_offset(i)) {
-      std::cout << "ERROR3\n";
-      std::cout << m_->ksuf_offset(i+1) << "\n";
-      std::cout << m_->ksuf_offset(i) << "\n";
-      std::cout << "m_nkeys = " << m_nkeys << "\n";
-      std::cout << "m_size = " << m_size << "\n";
-    }
-  }
 
   //resize(expand) n
   n_ = n_->resize((size_t)new_max_size, ti);
@@ -1520,7 +1500,12 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
     }
     else {
       uint8_t m_ikey_length = m_->keylenx_ikeylen(m_ikeylen[m_pos]);
+      //if (m_ikey_length > 8)
+      //m_ikey_length = (uint8_t)9;
       uint8_t n_ikey_length = n_->keylenx_ikeylen(n_ikeylen[n_pos]);
+      //if (n_ikey_length > 8)
+      //n_ikey_length = (uint8_t)9;
+
       if (m_ikey[m_pos] < n_ikey[n_pos]
 	  || ((m_ikey[m_pos] == n_ikey[n_pos]) && (m_ikey_length < n_ikey_length))) { 
 	//std::cout << "item_m inserted; m_pos = " << m_pos << ", n_pos = " << n_pos << "\n";
@@ -1768,8 +1753,6 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
 
   //fill in the last ksuf_offset position
   new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
-  if (new_n_ksuf_offset[new_n_pos] < new_n_ksuf_offset[new_n_pos - 1])
-    std::cout << "merge_nodes ERROR\n";
 
   //delete m
   m_->deallocate(ti_merge);
@@ -1828,16 +1811,6 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
   n_->set_size((uint32_t)new_nkeys);
   n_->set_allocated_size((size_t)new_size);
 
-  for (int i = 0; i < new_nkeys; i++) {
-    if (n_->ksuf_offset(i+1) < n_->ksuf_offset(i)) {
-      std::cout << "ERROR4\n";
-      std::cout << n_->ksuf_offset(i+1) << "\n";
-      std::cout << n_->ksuf_offset(i) << "\n";
-      std::cout << "new_nkeys = " << new_nkeys << "\n";
-      std::cout << "new_size = " << new_size << "\n";
-    }
-  }
-
   if (t.parent_node)
     t.parent_node->set_lv(t.parent_node_pos, leafvalue_static<P>(static_cast<node_base<P>*>(n_)));
   else
@@ -1867,16 +1840,6 @@ bool stcursor_merge<P>::add_item_to_node(merge_task t, threadinfo &ti) {
   int new_max_size = m_size + n_size;
   int n_nkeys = n_->size();
   int new_max_nkeys = n_nkeys + 1;
-
-  for (int i = 0; i < n_nkeys; i++) {
-    if (n_->ksuf_offset(i+1) < n_->ksuf_offset(i)) {
-      std::cout << "ERROR1\n";
-      std::cout << n_->ksuf_offset(i+1) << "\n";
-      std::cout << n_->ksuf_offset(i) << "\n";
-      std::cout << "n_nkeys = " << n_nkeys << "\n";
-      std::cout << "n_size = " << n_size << "\n";
-    }
-  }
 
   //resize(expand) n
   n_ = n_->resize((size_t)new_max_size, ti);
@@ -1948,15 +1911,20 @@ bool stcursor_merge<P>::add_item_to_node(merge_task t, threadinfo &ti) {
 
   while (!m_inserted && (n_pos < n_nkeys)) {
     //if deleted
-    if (n_ikeylen[n_pos] < 0) {
-      std::cout << "item deleted; m_inserted = " << m_inserted << ", n_pos = " << n_pos << "\n";
+    if (n_ikeylen[n_pos] == 0) {
+      //std::cout << "item deleted; m_inserted = " << m_inserted << ", n_pos = " << n_pos << "\n";
       n_ksuf_pos += (n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos]);
       n_pos++;
       new_nkeys--;
     }
     else {
       uint8_t m_ikey_length = m_->keylenx_ikeylen(t.ikeylen_m);
+      //if (m_ikey_length > 8)
+      //m_ikey_length = (uint8_t)9;
       uint8_t n_ikey_length = n_->keylenx_ikeylen(n_ikeylen[n_pos]);
+      //if (n_ikey_length > 8)
+      //n_ikey_length = (uint8_t)9;
+
       if (t.ikey_m < n_ikey[n_pos]
 	  || ((t.ikey_m == n_ikey[n_pos]) && (m_ikey_length < n_ikey_length))) { 
 	//std::cout << "item_m inserted; m_inserted = " << m_inserted << ", n_pos = " << n_pos << "\n";
@@ -2083,7 +2051,7 @@ bool stcursor_merge<P>::add_item_to_node(merge_task t, threadinfo &ti) {
 	  if (tt.ksuf_len_n > sizeof(ikey_type)) {
 	    tt.ksuf_len_n -= sizeof(ikey_type);
 	    tt.ksuf_n = (char*)malloc(tt.ksuf_len_n + 1);
-	    memcpy((void*)tt.ksuf_n, (const void*)n_ksuf_pos, tt.ksuf_len_n);
+	    memcpy((void*)tt.ksuf_n, (const void*)(n_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_n);
 	  }
 	  else {
 	    tt.ksuf_n = 0;
@@ -2136,9 +2104,6 @@ bool stcursor_merge<P>::add_item_to_node(merge_task t, threadinfo &ti) {
     copy_ksuf_len = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
     new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
 
-    //std::cout << "n_ksuf_offset[" << (n_pos + 1) << "] = " << n_ksuf_offset[n_pos + 1] << "\n";
-    //std::cout << "n_ksuf_offset[" << n_pos << "] = " << n_ksuf_offset[n_pos] << "\n";
-    //std::cout << "n_nkeys = " << n_nkeys << "\n";
     if (copy_ksuf_len < 0) {
       std::cout << "ERROR: add_item_to_node4, COPY_LENGTH < 0!!!\n";
       return false;
@@ -2155,19 +2120,6 @@ bool stcursor_merge<P>::add_item_to_node(merge_task t, threadinfo &ti) {
 
   //fill in the last ksuf_offset position
   new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
-  if (new_n_ksuf_offset[new_n_pos] < new_n_ksuf_offset[new_n_pos - 1])
-    std::cout << "add_item ERROR\n";
-
-  for (int i = 0; i < new_nkeys; i++) {
-    if (new_n_ksuf_offset[i+1] < new_n_ksuf_offset[i]) {
-      std::cout << "ERROR6\n";
-      std::cout << new_n_pos << " " << new_n_ksuf_offset[new_n_pos] << "\n";
-      std::cout << (new_n_pos - 1) << " " << new_n_ksuf_offset[new_n_pos - 1] << "\n";
-      std::cout << (i + 1) << " " << new_n_ksuf_offset[i+1] << "\n";
-      std::cout << i << " " << new_n_ksuf_offset[i] << "\n";
-      std::cout << "new_nkeys = " << new_nkeys << "\n";
-    }
-  }
 
   //delete m
   if (t.ksuf_len_m != 0)
@@ -2221,16 +2173,6 @@ bool stcursor_merge<P>::add_item_to_node(merge_task t, threadinfo &ti) {
   n_->set_size((uint32_t)new_nkeys);
   n_->set_allocated_size((uint32_t)new_size);
 
-  for (int i = 0; i < new_nkeys; i++) {
-    if (n_->ksuf_offset(i+1) < n_->ksuf_offset(i)) {
-      std::cout << "ERROR5\n";
-      std::cout << n_->ksuf_offset(i+1) << "\n";
-      std::cout << n_->ksuf_offset(i) << "\n";
-      std::cout << "new_nkeys = " << new_nkeys << "\n";
-      std::cout << "new_size = " << new_size << "\n";
-    }
-  }
-
   if (t.parent_node == NULL) {
     std::cout << "ERROR: add_item_to_node, parent_node is NULL!!!\n";
     return false;
@@ -2249,8 +2191,19 @@ bool stcursor_merge<P>::create_node(merge_task t, threadinfo &ti) {
   //std::cout << "create_node\n";
   size_t ksufSize = 0;
   uint32_t nkeys = 0;
-  
+
+  //if ((t.ikeylen_m == 0) || (t.ikeylen_n == 0))
+  //std::cout << "0 detected\n";
+  /*
+  uint8_t m_ikey_length = m_->keylenx_ikeylen(t.ikeylen_m);
+  if (m_ikey_length > 8)
+    m_ikey_length = (uint8_t)9;
+  uint8_t n_ikey_length = n_->keylenx_ikeylen(t.ikeylen_n);
+  if (n_ikey_length > 8)
+    n_ikey_length = (uint8_t)9;
+  */
   if ((t.ikey_m == t.ikey_n) && (t.ikeylen_m == t.ikeylen_n)) {
+    //if ((t.ikey_m == t.ikey_n) && (m_ikey_length == n_ikey_length)) {
     ksufSize = 0;
     nkeys = 1;
     n_ = massnode<P>::make(ksufSize, nkeys, ti);
@@ -2417,7 +2370,11 @@ bool stcursor_merge<P>::merge(threadinfo &ti, threadinfo &ti_merge) {
 template <typename P>
 inline uint8_t stcursor_merge<P>::convert_to_ikeylen(uint32_t len) {
   uint8_t ikeylen = (uint8_t)0;
-  if (len >= 8)
+  //if (len >= 8)
+  //ikeylen = (uint8_t)8;
+  if (len > 8)
+    ikeylen = (uint8_t)9;
+  else if (len == 8)
     ikeylen = (uint8_t)8;
   else if (len == 7)
     ikeylen = (uint8_t)7;
@@ -3422,7 +3379,7 @@ bool stcursor_merge_multivalue<P>::add_item_to_node(merge_task_multivalue t, thr
 	    if (tt.ksuf_len_n > sizeof(ikey_type)) {
 	      tt.ksuf_len_n -= sizeof(ikey_type);
 	      tt.ksuf_n = (char*)malloc(tt.ksuf_len_n + 1);
-	      memcpy((void*)tt.ksuf_n, (const void*)n_ksuf_pos, tt.ksuf_len_n);
+	      memcpy((void*)tt.ksuf_n, (const void*)(n_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_n);
 	    }
 	    else {
 	      tt.ksuf_n = 0;
@@ -3804,7 +3761,11 @@ bool stcursor_merge_multivalue<P>::merge(threadinfo &ti, threadinfo &ti_merge) {
 template <typename P>
 inline uint8_t stcursor_merge_multivalue<P>::convert_to_ikeylen(uint32_t len) {
   uint8_t ikeylen = (uint8_t)0;
-  if (len >= 8)
+  //if (len >= 8)
+  //ikeylen = (uint8_t)8;
+  if (len > 8)
+    ikeylen = (uint8_t)9;
+  else if (len == 8)
     ikeylen = (uint8_t)8;
   else if (len == 7)
     ikeylen = (uint8_t)7;
