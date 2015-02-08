@@ -61,6 +61,7 @@ int main(int argc, char *argv[]) {
   std::cout << "int " << "memory " << memory << "\n";
   */
   //std::cout << tput << "\n";
+  std::cout << merge_threshold << " " << merge_ratio << " " << "int " << "memory " << memory << "\n";
   std::cout << merge_threshold << " " << merge_ratio << " " << "int " << "insert " << tput << "\n";
 
   //load txns

@@ -26,6 +26,7 @@ int main() {
 
   int count = 0;
   uint64_t value = 0;
+  int64_t memory_string = 0;
   //read init file
   while ((count < LIMIT) && infile_txn.good()) {
     infile_load >> op >> key;
@@ -34,6 +35,7 @@ int main() {
       return -1;
     }
     init_keys.push_back(key);
+    memory_string += key.capacity();
     count++;
   }
 
@@ -55,7 +57,7 @@ int main() {
 
   double tput = count / (end_time - start_time) / 1000000; //Mops/sec
   //std::cout << tput << "\n";
-  std::cout << "stxbtree " << "url " << "memory " << (memory + 0.0)/1000000 << "\n";
+  std::cout << "stxbtree " << "url " << "memory " << (memory + memory_string + 0.0)/1000000 << "\n";
 
   //load txns
   count = 0;

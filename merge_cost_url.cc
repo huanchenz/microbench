@@ -1,6 +1,6 @@
 #include "microbench.hh"
 
-#define NUM_INTERVALS 100
+#define NUM_INTERVALS 50
 
 int main(int argc, char *argv[]) {
   int merge_threshold = atoi(argv[1]);
@@ -34,10 +34,13 @@ int main(int argc, char *argv[]) {
 
   //initial load
   //INSERT ONLY TEST
+  double times[NUM_INTERVALS];
   double tputs[NUM_INTERVALS];
+  double mem[NUM_INTERVALS];
   count = 0;
   int interval_count = 0;
   int size = init_keys.size();
+  double exact_start_time = get_now();
   double start_time = get_now();
   while (count < size) {
     uint64_t* value_ptr = &value;
@@ -48,7 +51,9 @@ int main(int argc, char *argv[]) {
     count++;
     value++;
     if (count % (LIMIT / NUM_INTERVALS) == 0) {
+      times[interval_count] = get_now() - exact_start_time;
       tputs[interval_count] = (LIMIT / NUM_INTERVALS) / (get_now() - start_time) / 1000000; //Mops/sec
+      mem[interval_count] = (hybrid.memory_consumption() + 0.0) / 1000000; //MB
       interval_count++;
       start_time = get_now();      
     }
@@ -60,7 +65,7 @@ int main(int argc, char *argv[]) {
   //std::cout << "hybrid " << "int " << "memory " << memory << "\n";
 
   for (int i = 0; i < (NUM_INTERVALS - 1); i++) {
-    std::cout << tputs[i] << "\n";
+    std::cout << times[i] << " " << tputs[i] << " " << mem[i] << "\n";
   }
 
   return 0;

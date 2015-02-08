@@ -64,6 +64,7 @@ int main(int argc, char *argv[]) {
   std::cout << "url " << "memory " << memory << "\n";
   */
   //std::cout << tput << "\n";
+  std::cout << merge_threshold << " " << merge_ratio << " " << "url " << "memory " << memory << "\n";
   std::cout << merge_threshold << " " << merge_ratio << " " << "url " << "insert " << tput << "\n";
 
   //load txns
