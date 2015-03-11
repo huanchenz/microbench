@@ -3,8 +3,8 @@
 int main(int argc, char *argv[]) {
   int merge_threshold = atoi(argv[1]);
   int merge_ratio = atoi(argv[2]);
-  std::ifstream infile_load("workloads/loadc_url_1M.dat");
-  std::ifstream infile_txn("workloads/txnsc_url_1M.dat");
+  std::ifstream infile_load("workloads/loadc_zipf_url_1M.dat");
+  std::ifstream infile_txn("workloads/txnsc_zipf_url_1M.dat");
 
   HybridType hybrid;
   hybrid.setup(false, merge_threshold, merge_ratio);
@@ -81,6 +81,9 @@ int main(int argc, char *argv[]) {
     }
     count++;
   }
+
+  if (merge_threshold <= LIMIT)
+    hybrid.merge(); //hack
 
   //DO TXNS
   start_time = get_now();

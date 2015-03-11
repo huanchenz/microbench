@@ -1,8 +1,8 @@
 #include "microbench.hh"
 
 int main() {
-  std::ifstream infile_load("workloads/loada_int_1M.dat");
-  std::ifstream infile_txn("workloads/txnsa_int_1M.dat");
+  std::ifstream infile_load("workloads/loada_zipf_int_1M.dat");
+  std::ifstream infile_txn("workloads/txnsa_zipf_int_1M.dat");
 
   BtreeType_str stxbtree;
   BtreeType_str::const_iterator stxbtree_keyIter;
@@ -83,7 +83,7 @@ int main() {
       sum += stxbtree_keyIter->second;
     }
     else if (ops[txn_num] == 2) { //UPDATE
-      stxbtree[key] = value;
+      stxbtree[keys[txn_num]] = value;
       value++;
     }
     else {

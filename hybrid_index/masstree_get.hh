@@ -556,6 +556,37 @@ bool stcursor<P>::remove() {
   }
 }
 
+template <typename P>
+bool stcursor<P>::update(const char *nv) {
+  if (!root_)
+    return false;
+  bool ksuf_match = false; //suffix
+  int kp, keylenx = 0;
+  n_ = static_cast<massnode<P>*>(root_);
+
+ nextNode:
+  kp = lower_bound_binary();
+  if (kp < 0)
+    return false;
+  keylenx = n_->ikeylen(kp);
+  lv_ = &(n_->get_lv()[kp]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    ka_.shift();
+    n_ = static_cast<massnode<P>*>(lv_->layer());
+    goto nextNode;
+  }
+  else {
+    if (!n_->isValid(kp))
+      return false;
+    ksuf_match = n_->ksuf_equals(kp, ka_, keylenx); //suffix
+    if (!ksuf_match) //suffix
+      return false;
+    n_->set_lv(kp, leafvalue_static<P>(nv));
+    //std::cout << "remove_kp = " << kp << "\n";
+    return true;
+  }
+}
+
   //huanchen-static-multivalue
 template <typename P>
 bool stcursor_multivalue<P>::remove() {
@@ -1383,6 +1414,7 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
   m_ = t.m;
   n_ = t.n;
   */
+
   if (t.m == NULL) {
     std::cout << "ERROR: merge_node, node m is NULL!!!\n";
     return false;
@@ -1470,6 +1502,7 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
   uint32_t* new_n_ksuf_offset = (uint32_t*)((char*)n_ + new_ksuf_offset_startpos);
   char* new_n_ksuf = (char*)((char*)n_ + new_ksuf_startpos);
 
+
   memmove((void*)(n_ksuf), (void*)((char*)n_ + n_ksuf_startpos), n_ksuf_len);
   memmove((void*)(n_ksuf_offset), (void*)((char*)n_ + n_ksuf_offset_startpos), n_ksuf_offset_len);
   memmove((void*)(n_lv), (void*)((char*)n_ + n_lv_startpos), n_lv_len);
@@ -1500,12 +1533,7 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
     }
     else {
       uint8_t m_ikey_length = m_->keylenx_ikeylen(m_ikeylen[m_pos]);
-      //if (m_ikey_length > 8)
-      //m_ikey_length = (uint8_t)9;
       uint8_t n_ikey_length = n_->keylenx_ikeylen(n_ikeylen[n_pos]);
-      //if (n_ikey_length > 8)
-      //n_ikey_length = (uint8_t)9;
-
       if (m_ikey[m_pos] < n_ikey[n_pos]
 	  || ((m_ikey[m_pos] == n_ikey[n_pos]) && (m_ikey_length < n_ikey_length))) { 
 	//std::cout << "item_m inserted; m_pos = " << m_pos << ", n_pos = " << n_pos << "\n";
@@ -1644,56 +1672,81 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
 	else {
 	  //std::cout << "both NOT layer; m_pos = " << m_pos << ", n_pos = " << n_pos << "\n";
 	  //if neither m_pos nor n_pos is layer
-	  new_n_ikeylen[new_n_pos] = (uint8_t)(n_ikeylen[n_pos] + (uint8_t)64);
-	  new_n_ikey[new_n_pos] = n_ikey[n_pos];
-	  //lv TBD
-	  new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+	  int ksuflen_m = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
+	  int ksuflen_n = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+	  if ((ksuflen_m == 0) && (ksuflen_n == 0)) {
+	    new_n_ikeylen[new_n_pos] = m_ikeylen[m_pos];
+	    new_n_ikey[new_n_pos] = m_ikey[m_pos];
+	    new_n_lv[new_n_pos] = m_lv[m_pos];
+	    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+	  }
+	  else if ((ksuflen_m == ksuflen_n) 
+		   && (strncmp(m_ksuf_pos, n_ksuf_pos, ksuflen_m) == 0)) {
+	    new_n_ikeylen[new_n_pos] = m_ikeylen[m_pos];
+	    new_n_ikey[new_n_pos] = m_ikey[m_pos];
+	    new_n_lv[new_n_pos] = m_lv[m_pos];
 
-	  merge_task tt;
-	  tt.task = 2; //create a new node to include m and n
-	  tt.parent_node = n_;
-	  tt.parent_node_pos = new_n_pos;
+	    copy_ksuf_len = ksuflen_m;
+	    memcpy(new_n_ksuf_pos, m_ksuf_pos, copy_ksuf_len);
 
-	  tt.lv_m = m_lv[m_pos];
-	  tt.ksuf_len_m = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
-	  //assign m next layer ikeylen
-	  tt.ikeylen_m = convert_to_ikeylen(tt.ksuf_len_m);
-	  //make m next layer ikey
-	  tt.ikey_m = string_slice<ikey_type>::make_comparable_sloppy(m_ksuf_pos, tt.ksuf_len_m);
-	    
-	  //make m next layer suffix
-	  if (tt.ksuf_len_m > sizeof(ikey_type)) {
-	    tt.ksuf_len_m -= sizeof(ikey_type);
-	    tt.ksuf_m = (char*)malloc(tt.ksuf_len_m + 1);
-	    memcpy((void*)tt.ksuf_m, (const void*)(m_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_m);
+	    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+	    new_n_ksuf_pos += copy_ksuf_len;
+	    m_ksuf_pos += copy_ksuf_len;
+	    n_ksuf_pos += copy_ksuf_len;
 	  }
 	  else {
-	    tt.ksuf_m = 0;
-	    tt.ksuf_len_m = 0;
-	  }
+	    new_n_ikeylen[new_n_pos] = (uint8_t)(n_ikeylen[n_pos] + (uint8_t)64);
+	    new_n_ikey[new_n_pos] = n_ikey[n_pos];
+	    //lv TBD
+	    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
 
+	    merge_task tt;
+	    tt.task = 2; //create a new node to include m and n
+	    tt.parent_node = n_;
+	    tt.parent_node_pos = new_n_pos;
 
-	  tt.lv_n = n_lv[n_pos];
-	  tt.ksuf_len_n = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
-	  //assign n next layer ikeylen
-	  tt.ikeylen_n = convert_to_ikeylen(tt.ksuf_len_n);
-	  //make n next layer ikey
-	  tt.ikey_n = string_slice<ikey_type>::make_comparable_sloppy(n_ksuf_pos, tt.ksuf_len_n);
+	    tt.lv_m = m_lv[m_pos];
+	    tt.ksuf_len_m = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
+	    //assign m next layer ikeylen
+	    tt.ikeylen_m = convert_to_ikeylen(tt.ksuf_len_m);
+	    //make m next layer ikey
+	    tt.ikey_m = string_slice<ikey_type>::make_comparable_sloppy(m_ksuf_pos, tt.ksuf_len_m);
 	    
-	  //make n next layer suffix
-	  if (tt.ksuf_len_n > sizeof(ikey_type)) {
-	    tt.ksuf_len_n -= sizeof(ikey_type);
-	    tt.ksuf_n = (char*)malloc(tt.ksuf_len_n + 1);
-	    memcpy((void*)tt.ksuf_n, (const void*)(n_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_n);
-	  }
-	  else {
-	    tt.ksuf_n = 0;
-	    tt.ksuf_len_n = 0;
-	  }
+	    //make m next layer suffix
+	    if (tt.ksuf_len_m > sizeof(ikey_type)) {
+	      tt.ksuf_len_m -= sizeof(ikey_type);
+	      tt.ksuf_m = (char*)malloc(tt.ksuf_len_m + 1);
+	      memcpy((void*)tt.ksuf_m, (const void*)(m_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_m);
+	    }
+	    else {
+	      tt.ksuf_m = 0;
+	      tt.ksuf_len_m = 0;
+	    }
 
-	  task_.push_back(tt);
-	  m_ksuf_pos += (m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos]);
-	  n_ksuf_pos += (n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos]);
+
+	    tt.lv_n = n_lv[n_pos];
+	    tt.ksuf_len_n = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+	    //assign n next layer ikeylen
+	    tt.ikeylen_n = convert_to_ikeylen(tt.ksuf_len_n);
+	    //make n next layer ikey
+	    tt.ikey_n = string_slice<ikey_type>::make_comparable_sloppy(n_ksuf_pos, tt.ksuf_len_n);
+	    
+	    //make n next layer suffix
+	    if (tt.ksuf_len_n > sizeof(ikey_type)) {
+	      tt.ksuf_len_n -= sizeof(ikey_type);
+	      tt.ksuf_n = (char*)malloc(tt.ksuf_len_n + 1);
+	      memcpy((void*)tt.ksuf_n, (const void*)(n_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_n);
+	    }
+	    else {
+	      tt.ksuf_n = 0;
+	      tt.ksuf_len_n = 0;
+	    }
+
+	    task_.push_back(tt);
+	    m_ksuf_pos += (m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos]);
+	    n_ksuf_pos += (n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos]);
+	  }
 	}
 
 	new_n_pos++;
@@ -1919,12 +1972,7 @@ bool stcursor_merge<P>::add_item_to_node(merge_task t, threadinfo &ti) {
     }
     else {
       uint8_t m_ikey_length = m_->keylenx_ikeylen(t.ikeylen_m);
-      //if (m_ikey_length > 8)
-      //m_ikey_length = (uint8_t)9;
       uint8_t n_ikey_length = n_->keylenx_ikeylen(n_ikeylen[n_pos]);
-      //if (n_ikey_length > 8)
-      //n_ikey_length = (uint8_t)9;
-
       if (t.ikey_m < n_ikey[n_pos]
 	  || ((t.ikey_m == n_ikey[n_pos]) && (m_ikey_length < n_ikey_length))) { 
 	//std::cout << "item_m inserted; m_inserted = " << m_inserted << ", n_pos = " << n_pos << "\n";
@@ -2010,56 +2058,80 @@ bool stcursor_merge<P>::add_item_to_node(merge_task t, threadinfo &ti) {
 	}
 	else {
 	  //std::cout << "both NOT layer; m_inserted = " << m_inserted << ", n_pos = " << n_pos << "\n";
-	  //if n_pos is NOT layer
-	  new_n_ikeylen[new_n_pos] = (uint8_t)(n_ikeylen[n_pos] + (uint8_t)64);
-	  new_n_ikey[new_n_pos] = n_ikey[n_pos];
-	  //lv TBD
-	  new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+	  int ksuflen_m = t.ksuf_len_m;
+	  int ksuflen_n = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+	  if ((ksuflen_m == 0) && (ksuflen_n == 0)) {
+	    new_n_ikeylen[new_n_pos] = t.ikeylen_m;
+	    new_n_ikey[new_n_pos] = t.ikey_m;
+	    new_n_lv[new_n_pos] = t.lv_m;
+	    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+	  }
+	  else if ((ksuflen_m == ksuflen_n) 
+		   && (strncmp(t.ksuf_m, n_ksuf_pos, ksuflen_m) == 0)) {
+	    new_n_ikeylen[new_n_pos] = t.ikeylen_m;
+	    new_n_ikey[new_n_pos] = t.ikey_m;
+	    new_n_lv[new_n_pos] = t.lv_m;
 
-	  merge_task tt;
-	  tt.task = 2; //create a new node to include m and n
-	  tt.parent_node = n_;
-	  tt.parent_node_pos = new_n_pos;
+	    copy_ksuf_len = ksuflen_m;
+	    memcpy(new_n_ksuf_pos, t.ksuf_m, copy_ksuf_len);
 
-	  tt.lv_m = t.lv_m;
-	  tt.ksuf_len_m = t.ksuf_len_m;
-	  //assign m next layer ikeylen
-	  tt.ikeylen_m = convert_to_ikeylen(tt.ksuf_len_m);
-	  //make m next layer ikey
-	  tt.ikey_m = string_slice<ikey_type>::make_comparable_sloppy(t.ksuf_m, tt.ksuf_len_m);
-	    
-	  //make m next layer suffix
-	  if (tt.ksuf_len_m > sizeof(ikey_type)) {
-	    tt.ksuf_len_m -= sizeof(ikey_type);
-	    tt.ksuf_m = (char*)malloc(tt.ksuf_len_m + 1);
-	    memcpy((void*)tt.ksuf_m, (const void*)(t.ksuf_m + sizeof(ikey_type)), tt.ksuf_len_m);
+	    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+	    new_n_ksuf_pos += copy_ksuf_len;
+	    n_ksuf_pos += copy_ksuf_len;
 	  }
 	  else {
-	    tt.ksuf_m = 0;
-	    tt.ksuf_len_m = 0;
-	  }
+	    //if n_pos is NOT layer
+	    new_n_ikeylen[new_n_pos] = (uint8_t)(n_ikeylen[n_pos] + (uint8_t)64);
+	    new_n_ikey[new_n_pos] = n_ikey[n_pos];
+	    //lv TBD
+	    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
 
+	    merge_task tt;
+	    tt.task = 2; //create a new node to include m and n
+	    tt.parent_node = n_;
+	    tt.parent_node_pos = new_n_pos;
 
-	  tt.lv_n = n_lv[n_pos];
-	  tt.ksuf_len_n = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
-	  //assign n next layer ikeylen
-	  tt.ikeylen_n = convert_to_ikeylen(tt.ksuf_len_n);
-	  //make n next layer ikey
-	  tt.ikey_n = string_slice<ikey_type>::make_comparable_sloppy(n_ksuf_pos, tt.ksuf_len_n);
+	    tt.lv_m = t.lv_m;
+	    tt.ksuf_len_m = t.ksuf_len_m;
+	    //assign m next layer ikeylen
+	    tt.ikeylen_m = convert_to_ikeylen(tt.ksuf_len_m);
+	    //make m next layer ikey
+	    tt.ikey_m = string_slice<ikey_type>::make_comparable_sloppy(t.ksuf_m, tt.ksuf_len_m);
 	    
-	  //make n next layer suffix
-	  if (tt.ksuf_len_n > sizeof(ikey_type)) {
-	    tt.ksuf_len_n -= sizeof(ikey_type);
-	    tt.ksuf_n = (char*)malloc(tt.ksuf_len_n + 1);
-	    memcpy((void*)tt.ksuf_n, (const void*)(n_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_n);
-	  }
-	  else {
-	    tt.ksuf_n = 0;
-	    tt.ksuf_len_n = 0;
-	  }
+	    //make m next layer suffix
+	    if (tt.ksuf_len_m > sizeof(ikey_type)) {
+	      tt.ksuf_len_m -= sizeof(ikey_type);
+	      tt.ksuf_m = (char*)malloc(tt.ksuf_len_m + 1);
+	      memcpy((void*)tt.ksuf_m, (const void*)(t.ksuf_m + sizeof(ikey_type)), tt.ksuf_len_m);
+	    }
+	    else {
+	      tt.ksuf_m = 0;
+	      tt.ksuf_len_m = 0;
+	    }
 
-	  task_.push_back(tt);
-	  n_ksuf_pos += (n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos]);
+
+	    tt.lv_n = n_lv[n_pos];
+	    tt.ksuf_len_n = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+	    //assign n next layer ikeylen
+	    tt.ikeylen_n = convert_to_ikeylen(tt.ksuf_len_n);
+	    //make n next layer ikey
+	    tt.ikey_n = string_slice<ikey_type>::make_comparable_sloppy(n_ksuf_pos, tt.ksuf_len_n);
+	    
+	    //make n next layer suffix
+	    if (tt.ksuf_len_n > sizeof(ikey_type)) {
+	      tt.ksuf_len_n -= sizeof(ikey_type);
+	      tt.ksuf_n = (char*)malloc(tt.ksuf_len_n + 1);
+	      memcpy((void*)tt.ksuf_n, (const void*)(n_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_n);
+	    }
+	    else {
+	      tt.ksuf_n = 0;
+	      tt.ksuf_len_n = 0;
+	    }
+
+	    task_.push_back(tt);
+	    n_ksuf_pos += (n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos]);
+	  }
 	}
 
 	new_nkeys--;
@@ -2125,7 +2197,6 @@ bool stcursor_merge<P>::add_item_to_node(merge_task t, threadinfo &ti) {
   if (t.ksuf_len_m != 0)
     free(t.ksuf_m);
 
-
   //compact n if needed
   int new_ikeylen_size = (int)(sizeof(uint8_t) * new_nkeys);
   int new_ikey_size = (int)(sizeof(ikey_type) * new_nkeys);
@@ -2180,8 +2251,6 @@ bool stcursor_merge<P>::add_item_to_node(merge_task t, threadinfo &ti) {
 
   t.parent_node->set_lv(t.parent_node_pos, leafvalue_static<P>(static_cast<node_base<P>*>(n_)));
 
-  //static_cast<massnode<P>*>(root_)->printSMT();
-
   return true;
 }
 
@@ -2191,19 +2260,8 @@ bool stcursor_merge<P>::create_node(merge_task t, threadinfo &ti) {
   //std::cout << "create_node\n";
   size_t ksufSize = 0;
   uint32_t nkeys = 0;
-
-  //if ((t.ikeylen_m == 0) || (t.ikeylen_n == 0))
-  //std::cout << "0 detected\n";
-  /*
-  uint8_t m_ikey_length = m_->keylenx_ikeylen(t.ikeylen_m);
-  if (m_ikey_length > 8)
-    m_ikey_length = (uint8_t)9;
-  uint8_t n_ikey_length = n_->keylenx_ikeylen(t.ikeylen_n);
-  if (n_ikey_length > 8)
-    n_ikey_length = (uint8_t)9;
-  */
+  
   if ((t.ikey_m == t.ikey_n) && (t.ikeylen_m == t.ikeylen_n)) {
-    //if ((t.ikey_m == t.ikey_n) && (m_ikey_length == n_ikey_length)) {
     ksufSize = 0;
     nkeys = 1;
     n_ = massnode<P>::make(ksufSize, nkeys, ti);
@@ -2306,10 +2364,6 @@ bool stcursor_merge<P>::create_node(merge_task t, threadinfo &ti) {
 	memcpy((void*)(n_->ksufpos(0)), (const void*)t.ksuf_n, t.ksuf_len_n);
       if (t.ksuf_len_m > 0)
 	memcpy((void*)(n_->ksufpos(1)), (const void*)t.ksuf_m, t.ksuf_len_m);
-      /*
-      if (t.parent_node_pos == 42)
-	static_cast<massnode<P>*>(root_)->printSMT();
-      */
     }
   }
 
@@ -2336,8 +2390,6 @@ bool stcursor_merge<P>::merge(threadinfo &ti, threadinfo &ti_merge) {
   merge_task t;
   bool merge_success = true;
 
-  //static_cast<massnode<P>*>(root_)->printSMT();
-
   t.task = 0; //merge m to n
   t.parent_node = NULL;
   t.m = static_cast<massnode<P>*>(merge_root_);
@@ -2346,6 +2398,8 @@ bool stcursor_merge<P>::merge(threadinfo &ti, threadinfo &ti_merge) {
 
   unsigned int cur_pos = 0;
   while (cur_pos < task_.size()) {
+    if (task_.size() % 10000 == 0)
+      std::cout << "1 task_.size() = " << task_.size() << "\n";
     if (task_[cur_pos].task == 0)
       merge_success = merge_nodes(task_[cur_pos], ti, ti_merge);
     else if (task_[cur_pos].task == 1)
@@ -2360,8 +2414,6 @@ bool stcursor_merge<P>::merge(threadinfo &ti, threadinfo &ti_merge) {
       return false;
     }
   }
-
-  //static_cast<massnode<P>*>(root_)->printSMT();
   //std::cout << "merge success-----------------------------------------\n";
   return merge_success;
 }
@@ -2371,7 +2423,7 @@ template <typename P>
 inline uint8_t stcursor_merge<P>::convert_to_ikeylen(uint32_t len) {
   uint8_t ikeylen = (uint8_t)0;
   //if (len >= 8)
-  //ikeylen = (uint8_t)8;
+  //ikeylen = (uint8_t)8; 
   if (len > 8)
     ikeylen = (uint8_t)9;
   else if (len == 8)
@@ -2401,6 +2453,7 @@ template <typename P>
 bool stcursor_merge_multivalue<P>::merge_nodes(merge_task_multivalue t, threadinfo &ti, threadinfo &ti_merge) {
   //std::cout << "merge_nodes(multivalue) start$$$$$$$$$$$\n";
   //std::cout << "alloc1 = " << ti.alloc << "\n";
+  /*
   if ((t.m == NULL) || (t.n == NULL)) {
     std::cout << "ERROR: merge_node(multivalue), node m or n is NULL!!!\n";
     return false;
@@ -2408,6 +2461,20 @@ bool stcursor_merge_multivalue<P>::merge_nodes(merge_task_multivalue t, threadin
 
   m_ = t.m;
   n_ = t.n;
+  */
+
+  if (t.m == NULL) {
+    std::cout << "ERROR: merge_node, node m is NULL!!!\n";
+    return false;
+  }
+  m_ = t.m;
+
+  if (t.n == NULL) {
+    root_ = m_;
+    return true;
+  }
+  else
+    n_ = t.n;
 
   //calculate size & num_keys of m, n and the tmp new node
   int m_size = m_->allocated_size();
@@ -3738,6 +3805,8 @@ bool stcursor_merge_multivalue<P>::merge(threadinfo &ti, threadinfo &ti_merge) {
 
   int cur_pos = 0;
   while (cur_pos < task_.size()) {
+    if (task_.size() % 10000 == 0)
+      std::cout << "task_.size() = " << task_.size() << "\n";
     if (task_[cur_pos].task == 0)
       merge_success = merge_nodes(task_[cur_pos], ti, ti_merge);
     else if (task_[cur_pos].task == 1)
@@ -3762,7 +3831,7 @@ template <typename P>
 inline uint8_t stcursor_merge_multivalue<P>::convert_to_ikeylen(uint32_t len) {
   uint8_t ikeylen = (uint8_t)0;
   //if (len >= 8)
-  //ikeylen = (uint8_t)8;
+  //ikeylen = (uint8_t)8; 
   if (len > 8)
     ikeylen = (uint8_t)9;
   else if (len == 8)

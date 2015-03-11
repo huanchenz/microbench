@@ -63,6 +63,7 @@ public:
   
   bool find();
   bool remove();
+  bool update(const char *nv);
 
   void destroy(threadinfo &ti);
 
@@ -135,8 +136,13 @@ public:
   inline const char* value() const {
     return (const char*)(n_->get_value() + lv_->value_pos_offset());
   }
+  /*
   inline const char* value_ptr() const {
     return (const char*)(n_->get_value() + lv_->value_pos_offset());
+  }
+  */
+  inline char* value_ptr() const {
+    return (char*)(n_->get_value() + lv_->value_pos_offset());
   }
   inline int value_len() const {
     return lv_->value_len();

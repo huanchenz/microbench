@@ -1,8 +1,8 @@
 #include "microbench.hh"
 
 int main() {
-  std::ifstream infile_load("workloads/loade_int_1M.dat");
-  std::ifstream infile_txn("workloads/txnse_int_1M.dat");
+  std::ifstream infile_load("workloads/loade_zipf_int_1M.dat");
+  std::ifstream infile_txn("workloads/txnse_zipf_int_1M.dat");
 
   BtreeType stxbtree;
   BtreeType::const_iterator stxbtree_keyIter;

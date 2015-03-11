@@ -5,7 +5,7 @@ CFLAGS = -g -W -Wall -O2 -fPIC
 DEPSDIR := .deps
 DEPCFLAGS = -MD -MF $(DEPSDIR)/$*.d -MP
 ifeq ($(strip $(MEMMGR)), )
-  MEMMGR = -ltcmalloc_minimal
+  MEMMGR = -ljemalloc
 endif
 ifneq ($(strip $(KEYSWAP)), )
   CFLAGS += -DKEYSWAP
@@ -16,7 +16,7 @@ endif
 ifneq ($(strip $(NOSUPERPAGE)), )
   CFLAGS += -DNOSUPERPAGE
 endif
-LIBS = -lnuma  -lpthread -lm
+LIBS = -lrt -lnuma  -lpthread -lm
 LDFLAGS = 
 
 all: mtIndexAPI.a

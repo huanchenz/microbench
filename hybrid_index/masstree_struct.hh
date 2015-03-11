@@ -890,31 +890,6 @@ public:
   }
 
   //=============================================================
-  void printSMT() {
-    if (this == NULL)
-      return;
-    std::vector<massnode<P>*> node_trace;
-    node_trace.push_back(this);
-    int cur_pos = 0;
-    std::cout << "###############\n";
-    while (cur_pos < node_trace.size()) {
-      massnode<P>* cur_node = node_trace[cur_pos];
-      std::cout << "node # = " << cur_pos << "\n";
-      std::cout << "nkeys = " << cur_node->size() << "\n";
-      std::cout << "size = " << cur_node->allocated_size() << "\n";
-      int num_child = 0;
-      for (int i = 0; i < cur_node->size(); i++) {
-	if (keylenx_is_layer(cur_node->ikeylen(i))) {
-	  node_trace.push_back(static_cast<massnode<P>*>(cur_node->lv(i).layer()));
-	  num_child++;
-	}
-      }
-      //std::cout << "num_child = " << num_child << "\n";
-
-      cur_pos++;
-    }
-    std::cout << "###############\n";
-  }
 
   int subtree_size() {
     if (this ==NULL)
@@ -1032,15 +1007,6 @@ public:
   }
 
   bool ksuf_equals(int p, const key_type &ka, int keylenx) {
-    /*
-    if (keylenx_has_ksuf(keylenx))
-      return equals_sloppy(p, ka);
-    else {
-      if (ka.suffix().len > 0)
-	return false;
-      return true;
-    }
-    */
     return !keylenx_has_ksuf(keylenx) || equals_sloppy(p, ka);
   }
 

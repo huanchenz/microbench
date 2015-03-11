@@ -1,8 +1,8 @@
 #include "microbench.hh"
 
 int main() {
-  std::ifstream infile_load("workloads/loada_url_1M.dat");
-  std::ifstream infile_txn("workloads/txnsa_url_1M.dat");
+  std::ifstream infile_load("workloads/loada_zipf_url_1M.dat");
+  std::ifstream infile_txn("workloads/txnsa_zipf_url_1M.dat");
 
   MapType_str stdmap;
   MapType_str::const_iterator stdmap_keyIter;
@@ -83,7 +83,7 @@ int main() {
       sum += stdmap_keyIter->second;
     }
     else if (ops[txn_num] == 2) { //UPDATE
-      stdmap[key] = value;
+      stdmap[keys[txn_num]] = value;
       value++;
     }
     else {

@@ -3,8 +3,8 @@
 int main(int argc, char *argv[]) {
   int merge_threshold = atoi(argv[1]);
   int merge_ratio = atoi(argv[2]);
-  std::ifstream infile_load("workloads/loade_url_1M.dat");
-  std::ifstream infile_txn("workloads/txnse_url_1M.dat");
+  std::ifstream infile_load("workloads/loade_zipf_url_1M.dat");
+  std::ifstream infile_txn("workloads/txnse_zipf_url_1M.dat");
 
   HybridType hybrid;
   hybrid.setup(KEY_LEN_STR, false, merge_threshold, merge_ratio);
@@ -30,6 +30,9 @@ int main(int argc, char *argv[]) {
       std::cout << "READING LOAD FILE FAIL!\n";
       return -1;
     }
+    if (merge_threshold > LIMIT)
+      if (key.size() > 256)
+	key = key.substr(0, 256);
     init_keys.push_back(key);
     count++;
   }
@@ -41,8 +44,9 @@ int main(int argc, char *argv[]) {
   while (count < (int)init_keys.size()) {
     uint64_t* value_ptr = &value;
     if (!hybrid.put_uv((const char*)(init_keys[count].c_str()), init_keys[count].size(), (const char*)value_ptr, 8)) {
-      std::cout << "LOAD FAIL!\n";
-      return -1;
+      //std::cout << "LOAD FAIL!\n";
+      //return -1;
+      ;
     }
     count++;
     value++;
@@ -56,6 +60,9 @@ int main(int argc, char *argv[]) {
   count = 0;
   while ((count < LIMIT) && infile_txn.good()) {
     infile_txn >> op >> key;
+    if (merge_threshold > LIMIT)
+      if (key.size() > 256)
+	key = key.substr(0, 256);
     if (op.compare(insert) == 0) { //INSERT
       ops.push_back(0);
       keys.push_back("0" + key);
@@ -74,6 +81,15 @@ int main(int argc, char *argv[]) {
     count++;
   }
 
+  //std::cout << hybrid.get_ic() << "\n";
+  //std::cout << hybrid.get_sic() << "\n";
+
+  if (merge_threshold <= LIMIT)
+    hybrid.merge(); //hack
+
+  //std::cout << hybrid.get_ic() << "\n";
+  //std::cout << hybrid.get_sic() << "\n";
+
   //SCAN/INSERT
   start_time = get_now();
   int txn_num = 0;
@@ -83,7 +99,8 @@ int main(int argc, char *argv[]) {
     if (ops[txn_num] == 0) { //INSERT
       uint64_t* value_ptr = &value;
       if (!hybrid.put_uv((const char*)(keys[txn_num].c_str()), keys[txn_num].size(), (const char*)value_ptr, 8)) {
-	std::cout << "INSERT FAIL!\n";
+	//std::cout << "INSERT FAIL!\n";
+	;
       }
       value++;
     }
@@ -97,6 +114,7 @@ int main(int argc, char *argv[]) {
 	  break;
 	}
       }
+      //std::cout << "scan\n";
     }
     else {
       std::cout << "UNRECOGNIZED CMD!\n";
@@ -115,6 +133,9 @@ int main(int argc, char *argv[]) {
     std::cout << "hybrid ";
   std::cout << "url " << "scan " << tput << "\n";
   //std::cout << "time elapsed = " << (end_time - start_time) << "\n";
+
+  //std::cout << "hybrid " << "int " << "dynamichit " << hybrid.get_mt_hit() << "\n";
+  //std::cout << "hybrid " << "int " << "statichit " << hybrid.get_cmt_hit() << "\n";
 
   return 0;
 }

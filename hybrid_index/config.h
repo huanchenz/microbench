@@ -35,7 +35,7 @@
 #define HAVE_CXX_STATIC_ASSERT 1
 
 /* Define if the C++ compiler understands template alias. */
-#define HAVE_CXX_TEMPLATE_ALIAS 1
+/* #undef HAVE_CXX_TEMPLATE_ALIAS */
 
 /* Define to 1 if you have the declaration of `clock_gettime', and to 0 if you
    don't. */
@@ -64,7 +64,7 @@
 #define HAVE_INTTYPES_H 1
 
 /* Define if you are using libjemalloc for malloc. */
-/* #undef HAVE_JEMALLOC */
+#define HAVE_JEMALLOC 1
 
 /* Define if you have libnuma. */
 #define HAVE_LIBNUMA 1
@@ -136,7 +136,7 @@
 #define HAVE_SYS_TYPES_H 1
 
 /* Define if you are using libtcmalloc for malloc. */
-#define HAVE_TCMALLOC 1
+/* #undef HAVE_TCMALLOC */
 
 /* Define to 1 if you have the <time.h> header file. */
 #define HAVE_TIME_H 1

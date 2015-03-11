@@ -1,8 +1,8 @@
 #include "microbench.hh"
 
 int main() {
-  std::ifstream infile_load("workloads/loadc_int_1M.dat");
-  std::ifstream infile_txn("workloads/txnsc_int_1M.dat");
+  std::ifstream infile_load("workloads/loadc_zipf_int_1M.dat");
+  std::ifstream infile_txn("workloads/txnsc_zipf_int_1M.dat");
 
   //MapType_str stdmap;
   //MapType_str::const_iterator stdmap_keyIter;

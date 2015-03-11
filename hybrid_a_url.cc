@@ -3,8 +3,8 @@
 int main(int argc, char *argv[]) {
   int merge_threshold = atoi(argv[1]);
   int merge_ratio = atoi(argv[2]);
-  std::ifstream infile_load("workloads/loada_url_1M.dat");
-  std::ifstream infile_txn("workloads/txnsa_url_1M.dat");
+  std::ifstream infile_load("workloads/loada_zipf_url_1M.dat");
+  std::ifstream infile_txn("workloads/txnsa_zipf_url_1M.dat");
 
   HybridType hybrid;
   hybrid.setup(false, merge_threshold, merge_ratio);
@@ -33,6 +33,9 @@ int main(int argc, char *argv[]) {
     count++;
   }
 
+  //hybrid.set_merge_threshold(1000001); //hack
+  //hybrid.set_merge_ratio(0); //hack
+
   //initial load
   //WRITE ONLY TEST
   count = 0;
@@ -50,7 +53,13 @@ int main(int argc, char *argv[]) {
 
   double tput = count / (end_time - start_time) / 1000000; //Mops/sec
   //double memory = (hybrid.memory_consumption() + 0.0) /1000000; //MB
-  std::cout << "hybrid " << "url " << "insert " << tput << "\n";
+  if (merge_threshold > LIMIT)
+    std::cout << "mt ";
+  else if (merge_threshold == LIMIT)
+    std::cout << "smt ";
+  else
+    std::cout << "hybrid ";
+  std::cout << "url " << "insert " << tput << "\n";
   //std::cout << "hybrid " << "string " << "memory " << memory << "\n";
 
   //load txns
@@ -71,6 +80,11 @@ int main(int argc, char *argv[]) {
     }
     count++;
   }
+
+  if (merge_threshold <= LIMIT)
+    hybrid.merge(); //hack
+  //hybrid.set_merge_threshold(1000); //hack
+  //hybrid.set_merge_ratio(20); //hack
 
   //DO TXNS
   start_time = get_now();
@@ -105,6 +119,9 @@ int main(int argc, char *argv[]) {
     std::cout << "hybrid ";
   std::cout << "url " << "read/update " << tput << "\n";
   //std::cout << "time elapsed = " << (end_time - start_time) << "\n";
+
+  //std::cout << "hybrid " << "int " << "dynamichit " << hybrid.get_mt_hit() << "\n";
+  //std::cout << "hybrid " << "int " << "statichit " << hybrid.get_cmt_hit() << "\n";
 
   return 0;
 }
