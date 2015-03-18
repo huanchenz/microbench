@@ -195,15 +195,15 @@ class threadinfo {
     };
 
   //huanchen-stats
-    int pool_alloc;
-    int pool_dealloc;
-    int pool_dealloc_rcu;
-    int alloc;
-    int dealloc;
-    int dealloc_rcu;
-    int valuebag_alloc;
-    int stringbag_alloc;
-    int limbo;
+    uint64_t pool_alloc;
+    uint64_t pool_dealloc;
+    uint64_t pool_dealloc_rcu;
+    uint64_t alloc;
+    uint64_t dealloc;
+    uint64_t dealloc_rcu;
+    uint64_t valuebag_alloc;
+    uint64_t stringbag_alloc;
+    uint64_t limbo;
 
     static threadinfo *make(int purpose, int index);
     // XXX destructor

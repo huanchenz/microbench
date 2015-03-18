@@ -7,7 +7,8 @@ MEMMGR = -ltcmalloc_minimal
 
 all: stdmap_a_int stdmap_a_str stdmap_a_url stdmap_c_int stdmap_c_str stdmap_c_url stdmap_e_int stdmap_e_str stdmap_e_url stxbtree_a_int stxbtree_a_str stxbtree_a_url stxbtree_c_int stxbtree_c_str stxbtree_c_url stxbtree_e_int stxbtree_e_str stxbtree_e_url hybrid_a_int hybrid_a_str hybrid_a_url hybrid_c_int hybrid_c_str hybrid_c_url hybrid_c_int_merge hybrid_c_str_merge hybrid_c_url_merge hybrid_e_int hybrid_e_str hybrid_e_url merge_cost_int merge_time_int merge_cost_str merge_time_str merge_cost_url merge_time_url
 
-#all: hybrid_a_int
+#all: hybrid_c_int
+#all: hybrid_a_url hybrid_c_url hybrid_e_url
 #all: stdmap_c_str stdmap_c_int
 
 hiTest.o: hiTest.cc hybrid_index/config.h $(DEPSDIR)/stamp

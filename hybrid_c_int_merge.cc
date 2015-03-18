@@ -3,8 +3,8 @@
 int main(int argc, char *argv[]) {
   int merge_threshold = atoi(argv[1]);
   int merge_ratio = atoi(argv[2]);
-  std::ifstream infile_load("workloads/loadc_int_1M.dat");
-  std::ifstream infile_txn("workloads/txnsc_int_1M.dat");
+  std::ifstream infile_load("workloads/loadc_zipf_int_100M.dat");
+  std::ifstream infile_txn("workloads/txnsc_zipf_int_100M.dat");
 
   HybridType hybrid;
   hybrid.setup(false, merge_threshold, merge_ratio);
@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
   int count = 0;
   uint64_t value = 0;
   //read init file
-  while ((count < LIMIT-1) && infile_load.good()) {
+  while ((count < (INIT_LIMIT - merge_threshold/2)) && infile_load.good()) {
     infile_load >> op >> key;
     if (op.compare(insert) != 0) {
       std::cout << "READING LOAD FILE FAIL!\n";

@@ -15,7 +15,8 @@
 #include "stx/btree.h"
 #include "hybrid_index/mtIndexAPI.hh"
 
-#define LIMIT 1000000
+#define INIT_LIMIT 50000000
+#define LIMIT 10000000
 #define KEY_LEN 8
 #define KEY_LEN_STR 32
 

@@ -3,8 +3,8 @@
 int main(int argc, char *argv[]) {
   int merge_threshold = atoi(argv[1]);
   int merge_ratio = atoi(argv[2]);
-  std::ifstream infile_load("workloads/loade_zipf_int_1M.dat");
-  std::ifstream infile_txn("workloads/txnse_zipf_int_1M.dat");
+  std::ifstream infile_load("workloads/loade_zipf_int_100M.dat");
+  std::ifstream infile_txn("workloads/txnse_zipf_int_100M.dat");
 
   HybridType hybrid;
   hybrid.setup(KEY_LEN_STR, false, merge_threshold, merge_ratio);
@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
   int count = 0;
   uint64_t value = 0;
   //read init file
-  while ((count < LIMIT) && infile_load.good()) {
+  while ((count < INIT_LIMIT) && infile_load.good()) {
     infile_load >> op >> key;
     if (op.compare(insert) != 0) {
       std::cout << "READING LOAD FILE FAIL!\n";
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
     count++;
   }
 
-  if (merge_threshold <= LIMIT)
+  if (merge_threshold <= INIT_LIMIT)
     hybrid.merge(); //hack
 
   //SCAN/INSERT
@@ -110,9 +110,9 @@ int main(int argc, char *argv[]) {
   end_time = get_now();
 
   tput = txn_num / (end_time - start_time) / 1000000; //Mops/sec
-  if (merge_threshold > LIMIT)
+  if (merge_threshold > INIT_LIMIT)
     std::cout << "mt ";
-  else if (merge_threshold == LIMIT)
+  else if (merge_threshold == INIT_LIMIT)
     std::cout << "smt ";
   else
     std::cout << "hybrid ";

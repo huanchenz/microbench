@@ -223,8 +223,10 @@ public:
     ic = 0;
   }
 
-  //put unique
-  //=====================================================================================  
+
+  //#################################################################################
+  // Insert Unique
+  //#################################################################################
   inline bool put_uv(const Str &key, const Str &value) {
     if ((sic != 0) && static_exist(key.s, key.len))
       return false;
@@ -242,6 +244,7 @@ public:
     lp.finish(1, *ti_);
     ic++;
     if (((ic * merge_ratio) >= sic) && (ic >= merge_threshold))
+      //if (ic >= merge_threshold)
       return merge_uv();
     return true;
   }
@@ -249,27 +252,10 @@ public:
     return put_uv(Str(key, keylen), Str(value, valuelen));
   }
 
-  inline bool static_put_uv(const Str &key, const Str &value) {
-    typename T::cursor_type lp(static_table_->table(), key);
-    bool found = lp.find_insert(*sti_);
-    if (!found)
-      sti_->advance_timestamp(lp.node_timestamp());
-    else {
-      lp.finish(1, *sti_);
-      return false;
-    }
-    qtimes_.ts = sti_->update_timestamp();
-    qtimes_.prev_ts = 0;
-    lp.value() = row_type::create1(value, qtimes_.ts, *sti_);
-    lp.finish(1, *sti_);
-    sic++;
-    return true;
-  }
 
-  //=====================================================================================  
-
-  //put (overwrite)
-  //=====================================================================================  
+  //#################################################################################
+  // Upsert
+  //#################################################################################
   inline void put(const Str &key, const Str &value) {
     typename T::cursor_type lp(table_->table(), key);
     bool found = lp.find_insert(*ti_);
@@ -285,36 +271,16 @@ public:
     }
     lp.value() = row_type::create1(value, qtimes_.ts, *ti_);
     lp.finish(1, *ti_);
-    //ic++;
     ic += (value.len/VALUE_LEN);
   }
   void put(const char *key, int keylen, const char *value, int valuelen) {
     return put(Str(key, keylen), Str(value, valuelen));
   }
 
-  inline void static_put(const Str &key, const Str &value) {
-    typename T::cursor_type lp(static_table_->table(), key);
-    bool found = lp.find_insert(*sti_);
-    if (!found) {
-      sti_->advance_timestamp(lp.node_timestamp());
-      qtimes_.ts = sti_->update_timestamp();
-      qtimes_.prev_ts = 0;
-    }
-    else {
-      qtimes_.ts = sti_->update_timestamp(lp.value()->timestamp());
-      qtimes_.prev_ts = lp.value()->timestamp();
-      lp.value()->deallocate_rcu(*sti_);
-    }
-    lp.value() = row_type::create1(value, qtimes_.ts, *sti_);
-    lp.finish(1, *sti_);
-    //sic++;
-    sic += (value.len/VALUE_LEN);
-  }
 
-  //=====================================================================================  
-
-  //put non-unique
-  //=====================================================================================  
+  //#################################################################################
+  // Insert (multi value)
+  //#################################################################################
   inline void put_nuv(const Str &key, const Str &value) {
     typename T::cursor_type lp(table_->table(), key);
     bool found = lp.find_insert(*ti_);
@@ -330,10 +296,8 @@ public:
     else {
       qtimes_.ts = ti_->update_timestamp(lp.value()->timestamp());
       qtimes_.prev_ts = lp.value()->timestamp();
-      //lp.value()->deallocate_rcu(*ti_);
       put_value_len = value.len + lp.value()->col(0).len;
       put_value_string = (char*)malloc(put_value_len);
-      //char put_value_string[4096];
       memcpy(put_value_string, value.s, value.len);
       memcpy(put_value_string + value.len, lp.value()->col(0).s, lp.value()->col(0).len);
       lp.value()->deallocate_rcu(*ti_);
@@ -341,52 +305,18 @@ public:
       free(put_value_string);
     }
     lp.finish(1, *ti_);
-    //ic++;
     ic += (value.len/VALUE_LEN);
-    //if (ic >= MERGE_THESHOLD)
-    //if (((ic * MERGE_RATIO) >= sic) && (ic >= MERGE_THESHOLD))
-    //if ((ic == 1000) && (sic == 0))
-    //if (((ic * merge_ratio) >= sic) && (ic >= MERGE_THESHOLD))
-    //merge_nuv();
+    if (((ic * merge_ratio) >= sic) && (ic >= merge_threshold))
+      return merge_nuv();
   }
   void put_nuv(const char *key, int keylen, const char *value, int valuelen) {
     return put_nuv(Str(key, keylen), Str(value, valuelen));
   }
 
-  inline void static_put_nuv(const Str &key, const Str &value) {
-    typename T::cursor_type lp(static_table_->table(), key);
-    bool found = lp.find_insert(*sti_);
-    if (!found)
-      sti_->advance_timestamp(lp.node_timestamp());
-    char *put_value_string;
-    int put_value_len;
-    if (!found) {
-      qtimes_.ts = sti_->update_timestamp();
-      qtimes_.prev_ts = 0;
-      lp.value() = row_type::create1(value, qtimes_.ts, *sti_);
-    }
-    else {
-      qtimes_.ts = sti_->update_timestamp(lp.value()->timestamp());
-      qtimes_.prev_ts = lp.value()->timestamp();
-      //lp.value()->deallocate_rcu(*ti_);
-      put_value_len = value.len + lp.value()->col(0).len;
-      put_value_string = (char*)malloc(put_value_len);
-      //char put_value_string[4096];
-      memcpy(put_value_string, value.s, value.len);
-      memcpy(put_value_string + value.len, lp.value()->col(0).s, lp.value()->col(0).len);
-      lp.value()->deallocate_rcu(*sti_);
-      lp.value() = row_type::create1(Str(put_value_string, put_value_len), qtimes_.ts, *sti_);
-      free(put_value_string);
-    }
-    lp.finish(1, *sti_);
-    //sic++;
-    sic += (value.len/VALUE_LEN);
-  }
 
-  //=====================================================================================
-
-  //get
-  //=====================================================================================
+  //#################################################################################
+  // Get (unique value)
+  //#################################################################################
   inline bool dynamic_get(const Str &key, Str &value) {
     if (ic == 0)
       return false;
@@ -407,12 +337,26 @@ public:
     bool found = lp.find();
     if (found)
       value = Str(lp.value(), VALUE_LEN);
+    //put_uv(key, value);
     return found;
   }
   inline bool static_get(const char *key, int keylen, Str &value) {
     return static_get(Str(key, keylen), value);
   }
 
+  inline bool get (const Str &key, Str &value) {
+    if (!dynamic_get(key, value))
+      return static_get(key, value);
+    return true;
+  }
+  bool get (const char *key, int keylen, Str &value) {
+    return get(Str(key, keylen), value);
+  }
+
+
+  //#################################################################################
+  // Get (multi value)
+  //#################################################################################
   inline bool static_get_nuv(const Str &key, Str &value) {
     if (sic == 0)
       return false;
@@ -424,15 +368,6 @@ public:
   }
   inline bool static_get_nuv(const char *key, int keylen, Str &value) {
     return static_get_nuv(Str(key, keylen), value);
-  }
-
-  inline bool get (const Str &key, Str &value) {
-    if (!dynamic_get(key, value))
-      return static_get(key, value);
-    return true;
-  }
-  bool get (const char *key, int keylen, Str &value) {
-    return get(Str(key, keylen), value);
   }
 
   inline bool get_nuv(const Str &key, Str &dynamic_value, Str &static_value) {
@@ -449,10 +384,11 @@ public:
   bool get_nuv(const char *key, int keylen, Str &dynamic_value, Str &static_value) {
     return get_nuv(Str(key, keylen), dynamic_value, static_value);
   }
-  //=====================================================================================
 
-  //get_ordered (prepare for get_next)
-  //=====================================================================================
+
+  //#################################################################################
+  // Get (ordered, unique)
+  //#################################################################################
   inline bool dynamic_get_ordered(const Str &key, Str &value) {
     if (ic == 0) {
       cur_keylen_ = 0;
@@ -493,6 +429,25 @@ public:
     return static_get_ordered(Str(key, keylen), value);
   }
 
+  inline bool get_ordered(const Str &key, Str &value) {
+    if (dynamic_get_ordered(key, value)) {
+      static_cur_keylen_ = 0;
+      return true;
+    }
+    if (static_get_ordered(key, value)) {
+      cur_keylen_ = 0;
+      return true;
+    }
+    return false;
+  }
+  bool get_ordered(const char *key, int keylen, Str &value) {
+    return get_ordered(Str(key, keylen), value);
+  }
+
+
+  //#################################################################################
+  // Get (ordered, multi value)
+  //#################################################################################
   inline bool static_get_ordered_nuv(const Str &key, Str &value) {
     if (sic == 0) {
       static_cur_keylen_ = 0;
@@ -513,21 +468,6 @@ public:
     return static_get_ordered_nuv(Str(key, keylen), value);
   }
 
-  inline bool get_ordered(const Str &key, Str &value) {
-    if (dynamic_get_ordered(key, value)) {
-      static_cur_keylen_ = 0;
-      return true;
-    }
-    if (static_get_ordered(key, value)) {
-      cur_keylen_ = 0;
-      return true;
-    }
-    return false;
-  }
-  bool get_ordered(const char *key, int keylen, Str &value) {
-    return get_ordered(Str(key, keylen), value);
-  }
-
   inline bool get_ordered_nuv(const Str &key, Str &dynamic_value, Str &static_value) {
     bool dynamic_get_success = dynamic_get_ordered(key, dynamic_value);
     bool static_get_success = static_get_ordered_nuv(key, static_value);
@@ -542,10 +482,11 @@ public:
   bool get_ordered_nuv(const char *key, int keylen, Str &dynamic_value, Str &static_value) {
     return get_ordered_nuv(Str(key, keylen), dynamic_value, static_value);
   }
-  //=====================================================================================
 
-  //exist
-  //=====================================================================================
+
+  //#################################################################################
+  // Exist
+  //#################################################################################
   inline bool exist(const Str &key) {
     typename T::unlocked_cursor_type lp(table_->table(), key);
     bool found = lp.find_unlocked(*ti_);
@@ -608,10 +549,12 @@ public:
     typename T::static_multivalue_cursor_type lp(static_table_->table(), Str(key, keylen));
     return lp.find();
   }
-  //=====================================================================================
 
-  //partial key get
-  //=====================================================================================
+
+  //#################################################################################
+  // Partial Key Get
+  //#################################################################################
+  /*
   bool get_upper_bound_or_equal(const char *key, int keylen, Str &retKey) {
     if (ic == 0)
       return false;
@@ -647,10 +590,11 @@ public:
     key = req[2].as_s();
     return true;
   }
-  //=====================================================================================
+  */
 
-  //partial key get (prepare for get_next)
-  //=====================================================================================
+  //#################################################################################
+  // Partial Key Get (ordered)
+  //#################################################################################
   inline bool dynamic_get_upper_bound_or_equal(const char *key, int keylen) {
     if (ic == 0)
       return false;
@@ -831,10 +775,11 @@ public:
     bool static_success = static_get_first_nuv();
     return dynamic_success || static_success;
   }
-  //=====================================================================================
 
-  //scan
-  //=====================================================================================
+
+  //#################################################################################
+  // Get Next
+  //#################################################################################
   bool get_next(const Str &cur_key, Str &key, Str &value) {
     std::vector<Str> keys;
     std::vector<Str> values;
@@ -872,10 +817,11 @@ public:
     value = values[1];
     return true;
   }
-  //=====================================================================================
 
-  //scan (prepare for get_next)
-  //=====================================================================================
+
+  //#################################################################################
+  // Get Next (ordered)
+  //#################################################################################
   inline bool dynamic_get_next(Str &value) {
     Json req = Json::array(0, 0, Str(cur_key_, cur_keylen_), 2);
     q_[0].run_scan(table_->table(), req, *ti_);
@@ -1220,10 +1166,11 @@ public:
     }
     return true;
   }
-  //=====================================================================================
 
-  //remove
-  //=====================================================================================
+
+  //#################################################################################
+  // Remove Unique
+  //#################################################################################
   inline bool dynamic_remove(const Str &key) {
     if (ic == 0)
       return false;
@@ -1258,10 +1205,11 @@ public:
   bool remove(const char *key, int keylen) {
     return remove(Str(key, keylen));
   }
-  //=====================================================================================
 
-  //remove non-unique
-  //=====================================================================================
+
+  //#################################################################################
+  // Remove Multi
+  //#################################################################################
   inline bool dynamic_remove_nuv(const Str &key, const Str &value) {
     if (ic == 0)
       return false;
@@ -1353,10 +1301,11 @@ public:
   bool remove_nuv(const char *key, int keylen, const char *value, int valuelen) {
     return remove_nuv(Str(key, keylen), Str(value, valuelen));
   }
-  //=====================================================================================
 
-  //replace
-  //=====================================================================================
+
+  //#################################################################################
+  // Replace
+  //#################################################################################
   inline bool dynamic_replace_first(const Str &key, const Str &value) {
     if (ic == 0)
       return false;
@@ -1389,7 +1338,6 @@ public:
     put(key, Str(put_value_string, put_value_len));
     free(put_value_string);
 
-    //static_remove(key);
     return static_remove_nuv(key);
   }
 
@@ -1431,13 +1379,9 @@ public:
     if (i == (lp.value()->col(0).len/value.len))
       return false;
 
-    //lp.value()->deallocate_rcu(*ti_);
     int found_pos = i * value.len;
     memcpy(put_value_string, lp.value()->col(0).s, put_value_len);
     memcpy(put_value_string + found_pos, value.s, value.len);
-    //memcpy(put_value_string, lp.value()->col(0).s, found_pos);
-    //memcpy(put_value_string + found_pos, value.s, value.len);
-    //memcpy(put_value_string + found_pos + value.len, lp.value()->col(0).s + found_pos + value.len, lp.value()->col(0).len - found_pos - value.len);
 
     lp.value()->deallocate_rcu(*ti_);
     lp.value() = row_type::create1(Str(put_value_string, put_value_len), qtimes_.ts, *ti_);
@@ -1484,10 +1428,11 @@ public:
   bool replace(const char *key, int keylen, const char *value, int valuelen, const char *old_value, int oldvaluelen) {
     return replace(Str(key, keylen), Str(value, valuelen), Str(old_value, oldvaluelen));
   }
-  //=====================================================================================
 
-  //update
-  //=====================================================================================
+
+  //#################################################################################
+  // Update
+  //#################################################################################
   inline bool static_update_uv(const Str &key, const char *value) {
     typename T::static_cursor_type lp(static_table_->table(), key);
     return lp.update(value);
@@ -1510,52 +1455,12 @@ public:
   bool update_uv(const char *key, int keylen, const char *value) {
     return update_uv(Str(key, keylen), value);
   }
-  //=====================================================================================
 
 
-  //merge
-  //=====================================================================================
+  //#################################################################################
+  // Merge
+  //#################################################################################
   bool merge_uv() {
-    /*
-    std::cout << "MEMORY CONSUMPTION = " << memory_consumption() << "\n";
-    std::cout << "TREE STATS===============================================\n";
-    tree_stats();
-    std::cout << "TREE STATS END===========================================\n";
-    std::cout << "STATIC TREE STATS========================================\n";
-    tree_stats();
-    std::cout << "STSTIC TREE STATS END====================================\n";
-    */
-    //std::cout << "ic = " << ic << "\n";
-    //std::cout << "sic = " << sic << "\n";
-    /*
-    if (first_merge) {
-      std::vector<Str> keys;
-      std::vector<Str> values;
-      Json req = Json::array(0, 0, Str("\0", 1), ic);
-      q_[0].run_scan(table_->table(), req, *ti_);
-      keys.clear();
-      values.clear();
-      for (int i = 2; i != req.size(); i+= 2) {
-	keys.push_back(req[i].as_s());
-	values.push_back(req[i + 1].as_s());
-      }
-      if (((int)(keys.size()) != ic) || ((int)(values.size()) != ic))
-	return false;
-      for (unsigned int j = 0; j < keys.size(); j++)
-	static_put(keys[j], values[j]);
-
-      q_[0].run_buildStatic(static_table_->table(), *sti_);
-      //TODO
-      //delete dynamic part
-      //static_table_->destroy(*sti_);
-      first_merge = false;
-    }
-    else {
-      q_[0].run_buildStatic(table_->table(), *ti_);
-      q_[0].run_merge(static_table_->table(), table_->table(), *sti_, *ti_);
-      sic += ic;
-    }
-    */
     //print_items();
     q_[0].run_buildStatic(table_->table(), *ti_);
     q_[0].run_merge(static_table_->table(), table_->table(), *sti_, *ti_);
@@ -1566,35 +1471,6 @@ public:
   }
 
   bool merge_nuv() {
-    //std::cout << "ic = " << ic << "\n";
-    //std::cout << "sic = " << sic << "\n";
-    /*
-    if (first_merge) {
-      std::vector<Str> keys;
-      std::vector<Str> values;
-      Json req = Json::array(0, 0, Str("\0", 1), ic);
-      q_[0].run_scan(table_->table(), req, *ti_);
-      keys.clear();
-      values.clear();
-      for (int i = 2; i != req.size(); i+= 2) {
-	keys.push_back(req[i].as_s());
-	values.push_back(req[i + 1].as_s());
-      }
-      //if ((keys.size() != ic) || (values.size() != ic))
-      //return false;
-      for (int j = 0; j < keys.size(); j++)
-	static_put_nuv(keys[j], values[j]);
-
-      q_[0].run_buildStatic_multivalue(static_table_->table(), *sti_);
-      //static_table_->destroy(*sti_);
-      first_merge = false;
-    }
-    else {
-      q_[0].run_buildStatic_multivalue(table_->table(), *ti_);
-      q_[0].run_merge_multivalue(static_table_->table(), table_->table(), *sti_, *ti_);
-      sic += ic;
-    }
-    */
     //print_items();
     q_[0].run_buildStatic_multivalue(table_->table(), *ti_);
     q_[0].run_merge_multivalue(static_table_->table(), table_->table(), *sti_, *ti_);
@@ -1604,6 +1480,17 @@ public:
     return true;
   }
 
+  bool merge() {
+    if (multivalue_)
+      return merge_nuv();
+    else
+      return merge_uv();
+  }
+
+
+  //#################################################################################
+  // Print Tree
+  //#################################################################################
   void print_items () {
     std::vector<Str> keys;
     std::vector<Str> values;
@@ -1645,9 +1532,12 @@ public:
     }
     std::cout << "\nEND-----------------------------------------------------------\n";
   }
-  //=====================================================================================
 
-  int memory_consumption () const {
+
+  //#################################################################################
+  // Memory Stats
+  //#################################################################################
+  uint64_t memory_consumption () const {
     /*
     std::cout << "pool_alloc = " << ti_->pool_alloc << "\n";
     std::cout << "pool_dealloc = " << ti_->pool_dealloc << "\n";
@@ -1710,19 +1600,22 @@ public:
     std::cout << "\t" << "limbo = " << sti_->limbo << "\n";
   }
 
+
+  //#################################################################################
+  // Accessors
+  //#################################################################################
   int get_ic () {
     return ic;
   }
-
   int get_sic () {
     return sic;
   }
 
-  bool merge() {
-    if (multivalue_)
-      return merge_nuv();
-    else
-      return merge_uv();
+  int get_merge_threshold() {
+    return merge_threshold();
+  }
+  int get_merge_ratio() {
+    return merge_ratio();
   }
 
 

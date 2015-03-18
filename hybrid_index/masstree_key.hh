@@ -140,12 +140,12 @@ class key {
     }
 
   //huanchen-static=================================================================
-  int compare_ikey(ikey_type ikey) const {
+  inline int compare_ikey(ikey_type ikey) const {
     int cmp = ::compare(this->ikey(), ikey);
     return cmp;
   }
 
-  int compare_len(int keylenx) const {
+  inline int compare_len(int keylenx) const {
     int cmp = 0;
     int al = this->length();
     if (al > ikey_size)

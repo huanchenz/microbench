@@ -674,6 +674,9 @@ inline int stcursor<P>::lower_bound_binary() const {
   int r = n_->nkeys_;
   while (l < r) {
     int m = (l + r) >> 1;
+
+    n_ -> prefetch((l + m)/2);
+    n_ -> prefetch((m + r)/2);
     int cmp = key_compare(ka_, *n_, m);
     if (cmp < 0)
       r = m;
@@ -692,6 +695,9 @@ inline int stcursor_multivalue<P>::lower_bound_binary() const {
   int r = n_->nkeys_;
   while (l < r) {
     int m = (l + r) >> 1;
+
+    n_ -> prefetch((l + m)/2);
+    n_ -> prefetch((m + r)/2);
     int cmp = key_compare(ka_, *n_, m);
     if (cmp < 0)
       r = m;
@@ -2398,8 +2404,8 @@ bool stcursor_merge<P>::merge(threadinfo &ti, threadinfo &ti_merge) {
 
   unsigned int cur_pos = 0;
   while (cur_pos < task_.size()) {
-    if (task_.size() % 10000 == 0)
-      std::cout << "1 task_.size() = " << task_.size() << "\n";
+    //if (task_.size() % 10000 == 0)
+    //std::cout << "1 task_.size() = " << task_.size() << "\n";
     if (task_[cur_pos].task == 0)
       merge_success = merge_nodes(task_[cur_pos], ti, ti_merge);
     else if (task_[cur_pos].task == 1)

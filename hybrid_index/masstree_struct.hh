@@ -1019,8 +1019,11 @@ public:
   //========================================================================================
 
   void deallocate(threadinfo &ti) {
-    //TODO
     ti.deallocate(this, size_, memtag_masstree_leaf);
+  }
+
+  void prefetch(int m) {
+    ::prefetch((const char*)get_ikey0() + sizeof(ikey_type) * m);
   }
 
 private:
@@ -1369,6 +1372,10 @@ public:
   void deallocate(threadinfo &ti) {
     //TODO
     ti.deallocate(this, size_, memtag_masstree_leaf);
+  }
+
+  void prefetch(int m) {
+    ::prefetch((const char*)get_ikey0() + sizeof(ikey_type) * m);
   }
 
 private:

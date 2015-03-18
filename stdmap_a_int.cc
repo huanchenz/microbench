@@ -1,8 +1,8 @@
 #include "microbench.hh"
 
 int main() {
-  std::ifstream infile_load("workloads/loada_zipf_int_1M.dat");
-  std::ifstream infile_txn("workloads/txnsa_zipf_int_1M.dat");
+  std::ifstream infile_load("workloads/loada_zipf_int_100M.dat");
+  std::ifstream infile_txn("workloads/txnsa_zipf_int_100M.dat");
 
   MapType stdmap;
   MapType::const_iterator stdmap_keyIter;
@@ -27,7 +27,7 @@ int main() {
   int count = 0;
   uint64_t value = 0;
   //read init file
-  while ((count < LIMIT) && infile_txn.good()) {
+  while ((count < INIT_LIMIT) && infile_txn.good()) {
     infile_load >> op >> key;
     if (op.compare(insert) != 0) {
       std::cout << "READING LOAD FILE FAIL!\n";
