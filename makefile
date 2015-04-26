@@ -9,7 +9,8 @@ MEMMGR = -ltcmalloc_minimal
 
 #all: multimap_a_int hybridmulti_a_int multimap_a_str hybridmulti_a_str multimap_a_url hybridmulti_a_url multimap_c_int hybridmulti_c_int multimap_c_str hybridmulti_c_str multimap_c_url hybridmulti_c_url multimap_e_int hybridmulti_e_int multimap_e_str hybridmulti_e_str multimap_e_url hybridmulti_e_url
 
-all: skiplist_a_int skiplist_a_str skiplist_a_url skiplist_c_int skiplist_c_str skiplist_c_url skiplist_e_int skiplist_e_str skiplist_e_url
+#all: skiplist_a_int skiplist_a_str skiplist_a_url skiplist_c_int skiplist_c_str skiplist_c_url skiplist_e_int skiplist_e_str skiplist_e_url
+all: skiplist_c_int
 #all: hybrid_a_int hybrid_c_int hybrid_e_int
 #all: hybrid_e_url
 #all: hybridmulti_e_int hybridmulti_e_str hybridmulti_e_url
