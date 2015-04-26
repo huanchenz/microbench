@@ -47,8 +47,8 @@ configure:2488: found /usr/bin/gcc
 configure:2499: result: gcc
 configure:2728: checking for C compiler version
 configure:2737: gcc --version >&5
-gcc (Ubuntu/Linaro 4.6.4-1ubuntu1~12.04) 4.6.4
-Copyright (C) 2011 Free Software Foundation, Inc.
+gcc (Ubuntu 4.8.1-2ubuntu1~12.04) 4.8.1
+Copyright (C) 2013 Free Software Foundation, Inc.
 This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
@@ -56,19 +56,19 @@ configure:2748: $? = 0
 configure:2737: gcc -v >&5
 Using built-in specs.
 COLLECT_GCC=gcc
-COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/4.6/lto-wrapper
+COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/4.8/lto-wrapper
 Target: x86_64-linux-gnu
-Configured with: ../src/configure -v --with-pkgversion='Ubuntu/Linaro 4.6.4-1ubuntu1~12.04' --with-bugurl=file:///usr/share/doc/gcc-4.6/README.Bugs --enable-languages=c,c++,fortran,objc,obj-c++ --prefix=/usr --program-suffix=-4.6 --enable-shared --enable-linker-build-id --with-system-zlib --libexecdir=/usr/lib --without-included-gettext --enable-threads=posix --with-gxx-include-dir=/usr/include/c++/4.6 --libdir=/usr/lib --enable-nls --with-sysroot=/ --enable-clocale=gnu --enable-libstdcxx-debug --enable-libstdcxx-time=yes --enable-gnu-unique-object --enable-plugin --enable-objc-gc --disable-werror --with-arch-32=i686 --with-tune=generic --enable-checking=release --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=x86_64-linux-gnu
+Configured with: ../src/configure -v --with-pkgversion='Ubuntu 4.8.1-2ubuntu1~12.04' --with-bugurl=file:///usr/share/doc/gcc-4.8/README.Bugs --enable-languages=c,c++,java,go,d,fortran,objc,obj-c++ --prefix=/usr --program-suffix=-4.8 --enable-shared --enable-linker-build-id --libexecdir=/usr/lib --without-included-gettext --enable-threads=posix --with-gxx-include-dir=/usr/include/c++/4.8 --libdir=/usr/lib --enable-nls --with-sysroot=/ --enable-clocale=gnu --enable-libstdcxx-debug --enable-libstdcxx-time=yes --enable-gnu-unique-object --enable-plugin --with-system-zlib --disable-browser-plugin --enable-java-awt=gtk --enable-gtk-cairo --with-java-home=/usr/lib/jvm/java-1.5.0-gcj-4.8-amd64/jre --enable-java-home --with-jvm-root-dir=/usr/lib/jvm/java-1.5.0-gcj-4.8-amd64 --with-jvm-jar-dir=/usr/lib/jvm-exports/java-1.5.0-gcj-4.8-amd64 --with-arch-directory=amd64 --with-ecj-jar=/usr/share/java/eclipse-ecj.jar --enable-objc-gc --enable-multiarch --disable-werror --with-arch-32=i686 --with-abi=m64 --with-multilib-list=m32,m64 --with-tune=generic --enable-checking=release --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=x86_64-linux-gnu
 Thread model: posix
-gcc version 4.6.4 (Ubuntu/Linaro 4.6.4-1ubuntu1~12.04) 
+gcc version 4.8.1 (Ubuntu 4.8.1-2ubuntu1~12.04) 
 configure:2748: $? = 0
 configure:2737: gcc -V >&5
-gcc: error: unrecognized option '-V'
+gcc: error: unrecognized command line option '-V'
 gcc: fatal error: no input files
 compilation terminated.
 configure:2748: $? = 4
 configure:2737: gcc -qversion >&5
-gcc: error: unrecognized option '-qversion'
+gcc: error: unrecognized command line option '-qversion'
 gcc: fatal error: no input files
 compilation terminated.
 configure:2748: $? = 4
@@ -109,8 +109,8 @@ configure:3288: found /usr/bin/g++
 configure:3299: result: g++
 configure:3326: checking for C++ compiler version
 configure:3335: g++ --version >&5
-g++ (Ubuntu/Linaro 4.6.4-1ubuntu1~12.04) 4.6.4
-Copyright (C) 2011 Free Software Foundation, Inc.
+g++ (Ubuntu 4.8.1-2ubuntu1~12.04) 4.8.1
+Copyright (C) 2013 Free Software Foundation, Inc.
 This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
@@ -118,19 +118,19 @@ configure:3346: $? = 0
 configure:3335: g++ -v >&5
 Using built-in specs.
 COLLECT_GCC=g++
-COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/4.6/lto-wrapper
+COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/4.8/lto-wrapper
 Target: x86_64-linux-gnu
-Configured with: ../src/configure -v --with-pkgversion='Ubuntu/Linaro 4.6.4-1ubuntu1~12.04' --with-bugurl=file:///usr/share/doc/gcc-4.6/README.Bugs --enable-languages=c,c++,fortran,objc,obj-c++ --prefix=/usr --program-suffix=-4.6 --enable-shared --enable-linker-build-id --with-system-zlib --libexecdir=/usr/lib --without-included-gettext --enable-threads=posix --with-gxx-include-dir=/usr/include/c++/4.6 --libdir=/usr/lib --enable-nls --with-sysroot=/ --enable-clocale=gnu --enable-libstdcxx-debug --enable-libstdcxx-time=yes --enable-gnu-unique-object --enable-plugin --enable-objc-gc --disable-werror --with-arch-32=i686 --with-tune=generic --enable-checking=release --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=x86_64-linux-gnu
+Configured with: ../src/configure -v --with-pkgversion='Ubuntu 4.8.1-2ubuntu1~12.04' --with-bugurl=file:///usr/share/doc/gcc-4.8/README.Bugs --enable-languages=c,c++,java,go,d,fortran,objc,obj-c++ --prefix=/usr --program-suffix=-4.8 --enable-shared --enable-linker-build-id --libexecdir=/usr/lib --without-included-gettext --enable-threads=posix --with-gxx-include-dir=/usr/include/c++/4.8 --libdir=/usr/lib --enable-nls --with-sysroot=/ --enable-clocale=gnu --enable-libstdcxx-debug --enable-libstdcxx-time=yes --enable-gnu-unique-object --enable-plugin --with-system-zlib --disable-browser-plugin --enable-java-awt=gtk --enable-gtk-cairo --with-java-home=/usr/lib/jvm/java-1.5.0-gcj-4.8-amd64/jre --enable-java-home --with-jvm-root-dir=/usr/lib/jvm/java-1.5.0-gcj-4.8-amd64 --with-jvm-jar-dir=/usr/lib/jvm-exports/java-1.5.0-gcj-4.8-amd64 --with-arch-directory=amd64 --with-ecj-jar=/usr/share/java/eclipse-ecj.jar --enable-objc-gc --enable-multiarch --disable-werror --with-arch-32=i686 --with-abi=m64 --with-multilib-list=m32,m64 --with-tune=generic --enable-checking=release --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=x86_64-linux-gnu
 Thread model: posix
-gcc version 4.6.4 (Ubuntu/Linaro 4.6.4-1ubuntu1~12.04) 
+gcc version 4.8.1 (Ubuntu 4.8.1-2ubuntu1~12.04) 
 configure:3346: $? = 0
 configure:3335: g++ -V >&5
-g++: error: unrecognized option '-V'
+g++: error: unrecognized command line option '-V'
 g++: fatal error: no input files
 compilation terminated.
 configure:3346: $? = 4
 configure:3335: g++ -qversion >&5
-g++: error: unrecognized option '-qversion'
+g++: error: unrecognized command line option '-qversion'
 g++: fatal error: no input files
 compilation terminated.
 configure:3346: $? = 4
@@ -147,6 +147,8 @@ configure:3514: g++ -E  conftest.cpp
 configure:3514: $? = 0
 configure:3528: g++ -E  conftest.cpp
 conftest.cpp:10:28: fatal error: ac_nonexistent.h: No such file or directory
+ #include <ac_nonexistent.h>
+                            ^
 compilation terminated.
 configure:3528: $? = 1
 configure: failed program was:
@@ -165,6 +167,8 @@ configure:3573: g++ -E  conftest.cpp
 configure:3573: $? = 0
 configure:3587: g++ -E  conftest.cpp
 conftest.cpp:10:28: fatal error: ac_nonexistent.h: No such file or directory
+ #include <ac_nonexistent.h>
+                            ^
 compilation terminated.
 configure:3587: $? = 1
 configure: failed program was:
@@ -229,6 +233,8 @@ configure:3863: result: yes
 configure:3875: checking whether byte ordering is bigendian
 configure:3890: g++ -c -g -O2  conftest.cpp >&5
 conftest.cpp:21:9: error: expected unqualified-id before 'not' token
+         not a universal capable compiler
+         ^
 configure:3890: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -260,7 +266,11 @@ configure:3935: $? = 0
 configure:3953: g++ -c -g -O2  conftest.cpp >&5
 conftest.cpp: In function 'int main()':
 conftest.cpp:27:8: error: 'big' was not declared in this scope
+    not big endian
+        ^
 conftest.cpp:27:12: error: expected ';' before 'endian'
+    not big endian
+            ^
 configure:3953: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -318,9 +328,9 @@ configure:4103: checking for numa.h
 configure:4103: result: yes
 configure:4114: checking for library containing numa_available
 configure:4145: g++ -o conftest -g -O2   conftest.cpp  >&5
-/tmp/ccJEb18I.o: In function `main':
+/tmp/ccqfK9cX.o: In function `main':
 /home/fawn/huanchen/microbench/hybrid_index/conftest.cpp:33: undefined reference to `numa_available'
-collect2: ld returned 1 exit status
+collect2: error: ld returned 1 exit status
 configure:4145: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -454,8 +464,14 @@ configure:4934: checking whether the C++ compiler understands 'auto'
 configure:4951: g++ -c -g -O2  conftest.cpp >&5
 conftest.cpp: In function 'int f(s)':
 conftest.cpp:45:41: error: ISO C++ forbids declaration of 'y' with no type [-fpermissive]
+ struct s { int a; }; int f(s x) { auto &y = x; return y.a; }
+                                         ^
 conftest.cpp:45:45: error: invalid initialization of reference of type 'int&' from expression of type 's'
+ struct s { int a; }; int f(s x) { auto &y = x; return y.a; }
+                                             ^
 conftest.cpp:45:57: error: request for member 'a' in 'y', which is of non-class type 'int'
+ struct s { int a; }; int f(s x) { auto &y = x; return y.a; }
+                                                         ^
 configure:4951: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -529,78 +545,19 @@ configure:5080: $? = 0
 configure:5087: result: yes
 configure:5095: checking whether the C++ compiler understands template alias
 configure:5112: g++ -std=gnu++0x -c -g -O2  conftest.cpp >&5
-conftest.cpp:49:75: error: expected unqualified-id before 'using'
-conftest.cpp: In function 'int main()':
-conftest.cpp:53:10: error: 'Y' was not declared in this scope
-conftest.cpp:53:12: error: expected primary-expression before 'int'
-configure:5112: $? = 1
-configure: failed program was:
-| /* confdefs.h */
-| #define PACKAGE_NAME "masstree-beta"
-| #define PACKAGE_TARNAME "masstree-beta"
-| #define PACKAGE_VERSION "0.1"
-| #define PACKAGE_STRING "masstree-beta 0.1"
-| #define PACKAGE_BUGREPORT ""
-| #define PACKAGE_URL ""
-| #define WORDS_BIGENDIAN_SET 1
-| #define STDC_HEADERS 1
-| #define HAVE_SYS_TYPES_H 1
-| #define HAVE_SYS_STAT_H 1
-| #define HAVE_STDLIB_H 1
-| #define HAVE_STRING_H 1
-| #define HAVE_MEMORY_H 1
-| #define HAVE_STRINGS_H 1
-| #define HAVE_INTTYPES_H 1
-| #define HAVE_STDINT_H 1
-| #define HAVE_UNISTD_H 1
-| #define HAVE_SYS_EPOLL_H 1
-| #define HAVE_NUMA_H 1
-| #define HAVE_LIBNUMA 1
-| #define HAVE___BUILTIN_CLZ 1
-| #define HAVE___BUILTIN_CLZL 1
-| #define HAVE___BUILTIN_CLZLL 1
-| #define HAVE___BUILTIN_CTZ 1
-| #define HAVE___BUILTIN_CTZL 1
-| #define HAVE___BUILTIN_CTZLL 1
-| #define HAVE___SYNC_SYNCHRONIZE 1
-| #define HAVE___SYNC_FETCH_AND_ADD 1
-| #define HAVE___SYNC_ADD_AND_FETCH 1
-| #define HAVE___SYNC_FETCH_AND_ADD_8 1
-| #define HAVE___SYNC_ADD_AND_FETCH_8 1
-| #define HAVE___SYNC_FETCH_AND_OR 1
-| #define HAVE___SYNC_OR_AND_FETCH 1
-| #define HAVE___SYNC_FETCH_AND_OR_8 1
-| #define HAVE___SYNC_OR_AND_FETCH_8 1
-| #define HAVE___SYNC_BOOL_COMPARE_AND_SWAP 1
-| #define HAVE___SYNC_BOOL_COMPARE_AND_SWAP_8 1
-| #define HAVE___SYNC_VAL_COMPARE_AND_SWAP 1
-| #define HAVE___SYNC_VAL_COMPARE_AND_SWAP_8 1
-| #define HAVE___SYNC_LOCK_TEST_AND_SET 1
-| #define HAVE___SYNC_LOCK_TEST_AND_SET_VAL 1
-| #define HAVE___SYNC_LOCK_RELEASE_SET 1
-| #define HAVE_CXX_AUTO 1
-| #define HAVE_CXX_CONSTEXPR 1
-| #define HAVE_CXX_STATIC_ASSERT 1
-| #define HAVE_CXX_RVALUE_REFERENCES 1
-| /* end confdefs.h.  */
-| template <typename T> struct X { typedef T type; }; template <typename T> using Y = X<T>; int f(int x) { return x; }
-| int
-| main ()
-| {
-| return f(Y<int>::type());
-|   ;
-|   return 0;
-| }
-configure:5119: result: no
+configure:5112: $? = 0
+configure:5119: result: yes
 configure:5129: checking type_traits usability
 configure:5129: g++ -std=gnu++0x -c -g -O2  conftest.cpp >&5
 configure:5129: $? = 0
 configure:5129: result: yes
 configure:5129: checking type_traits presence
 configure:5129: g++ -E  conftest.cpp
-In file included from /usr/include/c++/4.6/type_traits:35:0,
-                 from conftest.cpp:49:
-/usr/include/c++/4.6/bits/c++0x_warning.h:32:2: error: #error This file requires compiler and library support for the upcoming ISO C++ standard, C++0x. This support is currently experimental, and must be enabled with the -std=c++0x or -std=gnu++0x compiler options.
+In file included from /usr/include/c++/4.8/type_traits:35:0,
+                 from conftest.cpp:50:
+/usr/include/c++/4.8/bits/c++0x_warning.h:32:2: error: #error This file requires compiler and library support for the ISO C++ 2011 standard. This support is currently experimental, and must be enabled with the -std=c++11 or -std=gnu++11 compiler options.
+ #error This file requires compiler and library support for the \
+  ^
 configure:5129: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -650,6 +607,7 @@ configure: failed program was:
 | #define HAVE_CXX_CONSTEXPR 1
 | #define HAVE_CXX_STATIC_ASSERT 1
 | #define HAVE_CXX_RVALUE_REFERENCES 1
+| #define HAVE_CXX_TEMPLATE_ALIAS 1
 | /* end confdefs.h.  */
 | #include <type_traits>
 configure:5129: result: no
@@ -672,10 +630,16 @@ configure:5225: result: yes
 configure:5237: checking for std::is_trivially_copyable
 configure:5254: g++ -std=gnu++0x -c -g -O2  conftest.cpp >&5
 conftest.cpp: In function 'int main()':
-conftest.cpp:56:8: error: 'is_trivially_copyable' is not a member of 'std'
-conftest.cpp:56:35: error: expected primary-expression before 'int'
-conftest.cpp:56:35: error: expected ';' before 'int'
-conftest.cpp:56:38: error: expected unqualified-id before '>' token
+conftest.cpp:57:8: error: 'is_trivially_copyable' is not a member of 'std'
+ return std::is_trivially_copyable<int>::value;
+        ^
+conftest.cpp:57:35: error: expected primary-expression before 'int'
+ return std::is_trivially_copyable<int>::value;
+                                   ^
+conftest.cpp:57:35: error: expected ';' before 'int'
+conftest.cpp:57:38: error: expected unqualified-id before '>' token
+ return std::is_trivially_copyable<int>::value;
+                                      ^
 configure:5254: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -725,6 +689,7 @@ configure: failed program was:
 | #define HAVE_CXX_CONSTEXPR 1
 | #define HAVE_CXX_STATIC_ASSERT 1
 | #define HAVE_CXX_RVALUE_REFERENCES 1
+| #define HAVE_CXX_TEMPLATE_ALIAS 1
 | #define HAVE_TYPE_TRAITS 1
 | #define HAVE_STD_HASH 1
 | #define HAVE___HAS_TRIVIAL_COPY 1
@@ -745,7 +710,7 @@ configure:5293: result: yes
 configure:5303: checking for malloc in -lflow
 configure:5328: g++ -std=gnu++0x -o conftest -g -O2   conftest.cpp -lflow  -lnuma  >&5
 /usr/bin/ld: cannot find -lflow
-collect2: ld returned 1 exit status
+collect2: error: ld returned 1 exit status
 configure:5328: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -795,6 +760,7 @@ configure: failed program was:
 | #define HAVE_CXX_CONSTEXPR 1
 | #define HAVE_CXX_STATIC_ASSERT 1
 | #define HAVE_CXX_RVALUE_REFERENCES 1
+| #define HAVE_CXX_TEMPLATE_ALIAS 1
 | #define HAVE_TYPE_TRAITS 1
 | #define HAVE_STD_HASH 1
 | #define HAVE___HAS_TRIVIAL_COPY 1
@@ -827,7 +793,7 @@ configure:5421: result: yes
 configure:5429: checking for _Z16getMainHoardHeapv in -lhoard
 configure:5454: g++ -std=gnu++0x -o conftest -g -O2   conftest.cpp -lhoard  -lnuma  >&5
 /usr/bin/ld: cannot find -lhoard
-collect2: ld returned 1 exit status
+collect2: error: ld returned 1 exit status
 configure:5454: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -877,6 +843,7 @@ configure: failed program was:
 | #define HAVE_CXX_CONSTEXPR 1
 | #define HAVE_CXX_STATIC_ASSERT 1
 | #define HAVE_CXX_RVALUE_REFERENCES 1
+| #define HAVE_CXX_TEMPLATE_ALIAS 1
 | #define HAVE_TYPE_TRAITS 1
 | #define HAVE_STD_HASH 1
 | #define HAVE___HAS_TRIVIAL_COPY 1
@@ -905,8 +872,12 @@ configure:5517: result: -ljemalloc
 configure:5546: checking whether off_t and long are the same type
 configure:5563: g++ -std=gnu++0x -c -g -O2  conftest.cpp >&5
 conftest.cpp: In function 'int f(long int)':
-conftest.cpp:55:30: error: redefinition of 'int f(long int)'
-conftest.cpp:55:5: error: 'int f(off_t)' previously defined here
+conftest.cpp:56:30: error: redefinition of 'int f(long int)'
+ int f(off_t) {return 0;} int f(long) {return 0;}
+                              ^
+conftest.cpp:56:5: error: 'int f(off_t)' previously defined here
+ int f(off_t) {return 0;} int f(long) {return 0;}
+     ^
 configure:5563: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -956,6 +927,7 @@ configure: failed program was:
 | #define HAVE_CXX_CONSTEXPR 1
 | #define HAVE_CXX_STATIC_ASSERT 1
 | #define HAVE_CXX_RVALUE_REFERENCES 1
+| #define HAVE_CXX_TEMPLATE_ALIAS 1
 | #define HAVE_TYPE_TRAITS 1
 | #define HAVE_STD_HASH 1
 | #define HAVE___HAS_TRIVIAL_COPY 1
@@ -979,8 +951,12 @@ configure:5605: result: no
 configure:5616: checking whether int64_t and long are the same type
 configure:5633: g++ -std=gnu++0x -c -g -O2  conftest.cpp >&5
 conftest.cpp: In function 'int f(long int)':
-conftest.cpp:56:32: error: redefinition of 'int f(long int)'
-conftest.cpp:56:5: error: 'int f(int64_t)' previously defined here
+conftest.cpp:57:32: error: redefinition of 'int f(long int)'
+ int f(int64_t) {return 0;} int f(long) {return 0;}
+                                ^
+conftest.cpp:57:5: error: 'int f(int64_t)' previously defined here
+ int f(int64_t) {return 0;} int f(long) {return 0;}
+     ^
 configure:5633: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -1030,6 +1006,7 @@ configure: failed program was:
 | #define HAVE_CXX_CONSTEXPR 1
 | #define HAVE_CXX_STATIC_ASSERT 1
 | #define HAVE_CXX_RVALUE_REFERENCES 1
+| #define HAVE_CXX_TEMPLATE_ALIAS 1
 | #define HAVE_TYPE_TRAITS 1
 | #define HAVE_STD_HASH 1
 | #define HAVE___HAS_TRIVIAL_COPY 1
@@ -1058,8 +1035,12 @@ configure:5710: result: no
 configure:5721: checking whether size_t and unsigned long are the same type
 configure:5738: g++ -std=gnu++0x -c -g -O2  conftest.cpp >&5
 conftest.cpp: In function 'int f(long unsigned int)':
-conftest.cpp:57:31: error: redefinition of 'int f(long unsigned int)'
-conftest.cpp:57:5: error: 'int f(size_t)' previously defined here
+conftest.cpp:58:31: error: redefinition of 'int f(long unsigned int)'
+ int f(size_t) {return 0;} int f(unsigned long) {return 0;}
+                               ^
+conftest.cpp:58:5: error: 'int f(size_t)' previously defined here
+ int f(size_t) {return 0;} int f(unsigned long) {return 0;}
+     ^
 configure:5738: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -1109,6 +1090,7 @@ configure: failed program was:
 | #define HAVE_CXX_CONSTEXPR 1
 | #define HAVE_CXX_STATIC_ASSERT 1
 | #define HAVE_CXX_RVALUE_REFERENCES 1
+| #define HAVE_CXX_TEMPLATE_ALIAS 1
 | #define HAVE_TYPE_TRAITS 1
 | #define HAVE_STD_HASH 1
 | #define HAVE___HAS_TRIVIAL_COPY 1
@@ -1136,10 +1118,14 @@ configure:5790: g++ -std=gnu++0x -c -g -O2  conftest.cpp >&5
 configure:5790: $? = 0
 configure:5790: g++ -std=gnu++0x -c -g -O2  conftest.cpp >&5
 conftest.cpp: In function 'int main()':
-conftest.cpp:93:14: error: expected primary-expression before 'long'
-conftest.cpp:93:14: error: expected ')' before 'long'
-conftest.cpp:94:14: error: expected ')' before ';' token
-conftest.cpp:94:14: error: expected ')' before ';' token
+conftest.cpp:94:14: error: expected primary-expression before 'long'
+ if (sizeof ((long long)))
+              ^
+conftest.cpp:94:14: error: expected ')' before 'long'
+conftest.cpp:95:14: error: expected ')' before ';' token
+      return 0;
+              ^
+conftest.cpp:95:14: error: expected ')' before ';' token
 configure:5790: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -1189,6 +1175,7 @@ configure: failed program was:
 | #define HAVE_CXX_CONSTEXPR 1
 | #define HAVE_CXX_STATIC_ASSERT 1
 | #define HAVE_CXX_RVALUE_REFERENCES 1
+| #define HAVE_CXX_TEMPLATE_ALIAS 1
 | #define HAVE_TYPE_TRAITS 1
 | #define HAVE_STD_HASH 1
 | #define HAVE___HAS_TRIVIAL_COPY 1
@@ -1300,9 +1287,9 @@ configure:5991: $? = 0
 configure:5991: result: yes
 configure:6005: checking for library containing clock_gettime
 configure:6036: g++ -std=gnu++0x -o conftest -g -O2   conftest.cpp -lnuma  >&5
-/tmp/ccrvO1n4.o: In function `main':
-/home/fawn/huanchen/microbench/hybrid_index/conftest.cpp:78: undefined reference to `clock_gettime'
-collect2: ld returned 1 exit status
+/tmp/cc7jlJx1.o: In function `main':
+/home/fawn/huanchen/microbench/hybrid_index/conftest.cpp:79: undefined reference to `clock_gettime'
+collect2: error: ld returned 1 exit status
 configure:6036: $? = 1
 configure: failed program was:
 | /* confdefs.h */
@@ -1352,6 +1339,7 @@ configure: failed program was:
 | #define HAVE_CXX_CONSTEXPR 1
 | #define HAVE_CXX_STATIC_ASSERT 1
 | #define HAVE_CXX_RVALUE_REFERENCES 1
+| #define HAVE_CXX_TEMPLATE_ALIAS 1
 | #define HAVE_TYPE_TRAITS 1
 | #define HAVE_STD_HASH 1
 | #define HAVE___HAS_TRIVIAL_COPY 1
@@ -1418,9 +1406,9 @@ generated by GNU Autoconf 2.68.  Invocation command line was
 
 on xia-router2
 
-config.status:871: creating GNUmakefile
-config.status:871: creating config.h
-config.status:1041: config.h is unchanged
+config.status:872: creating GNUmakefile
+config.status:872: creating config.h
+config.status:1042: config.h is unchanged
 
 ## ---------------- ##
 ## Cache variables. ##
@@ -1433,7 +1421,7 @@ ac_cv_cxx_compiler_gnu=yes
 ac_cv_cxx_constexpr=yes
 ac_cv_cxx_rvalue_references=yes
 ac_cv_cxx_static_assert=yes
-ac_cv_cxx_template_alias=no
+ac_cv_cxx_template_alias=yes
 ac_cv_env_CCC_set=
 ac_cv_env_CCC_value=
 ac_cv_env_CC_set=
@@ -1645,6 +1633,7 @@ target_alias=''
 #define HAVE_CXX_CONSTEXPR 1
 #define HAVE_CXX_STATIC_ASSERT 1
 #define HAVE_CXX_RVALUE_REFERENCES 1
+#define HAVE_CXX_TEMPLATE_ALIAS 1
 #define HAVE_TYPE_TRAITS 1
 #define HAVE_STD_HASH 1
 #define HAVE___HAS_TRIVIAL_COPY 1
@@ -1691,474 +1680,6 @@ generated by GNU Autoconf 2.68.  Invocation command line was
 on xia-router2
 
 config.status:: creating GNUmakefile
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
-
-## ---------------------- ##
-## Running config.status. ##
-## ---------------------- ##
-
-This file was extended by masstree-beta config.status 0.1, which was
-generated by GNU Autoconf 2.68.  Invocation command line was
-
-  CONFIG_FILES    = 
-  CONFIG_HEADERS  = 
-  CONFIG_LINKS    = 
-  CONFIG_COMMANDS = 
-  $ ./config.status 
-
-on xia-router2
-
-config.status:: creating config.h
-config.status:: config.h is unchanged
 
 ## ---------------------- ##
 ## Running config.status. ##

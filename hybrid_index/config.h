@@ -35,7 +35,7 @@
 #define HAVE_CXX_STATIC_ASSERT 1
 
 /* Define if the C++ compiler understands template alias. */
-/* #undef HAVE_CXX_TEMPLATE_ALIAS */
+#define HAVE_CXX_TEMPLATE_ALIAS 1
 
 /* Define to 1 if you have the declaration of `clock_gettime', and to 0 if you
    don't. */

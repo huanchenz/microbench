@@ -62,28 +62,28 @@ echo "23/36"
 echo "24/36"
 ./hybrid_e_str $MERGE_THRESHOLD $MERGE_RATIO >> $OUTPUT_MICROBENCH
 
-echo "25/36"
-./stdmap_a_url >> $OUTPUT_MICROBENCH
-echo "26/36"
-./stxbtree_a_url>> $OUTPUT_MICROBENCH
-echo "27/36"
-./hybrid_a_url $MERGE_THRESHOLD_MT $MERGE_RATIO_MT >> $OUTPUT_MICROBENCH
-echo "28/36"
-./hybrid_a_url $MERGE_THRESHOLD $MERGE_RATIO >> $OUTPUT_MICROBENCH
-echo "29/36"
-./stdmap_c_url >> $OUTPUT_MICROBENCH
-echo "30/36"
-./stxbtree_c_url >> $OUTPUT_MICROBENCH
-echo "31/36"
-./hybrid_c_url $MERGE_THRESHOLD_MT $MERGE_RATIO_MT >> $OUTPUT_MICROBENCH
-echo "32/36"
-./hybrid_c_url $MERGE_THRESHOLD $MERGE_RATIO >> $OUTPUT_MICROBENCH
-echo "33/36"
-./stdmap_e_url >> $OUTPUT_MICROBENCH
-echo "34/36"
-./stxbtree_e_url >> $OUTPUT_MICROBENCH
-echo "35/36"
-./hybrid_e_url $MERGE_THRESHOLD_MT $MERGE_RATIO_MT >> $OUTPUT_MICROBENCH
-echo "36/36"
-./hybrid_e_url $MERGE_THRESHOLD $MERGE_RATIO >> $OUTPUT_MICROBENCH
+#echo "25/36"
+#./stdmap_a_url >> $OUTPUT_MICROBENCH
+#echo "26/36"
+#./stxbtree_a_url>> $OUTPUT_MICROBENCH
+#echo "27/36"
+#./hybrid_a_url $MERGE_THRESHOLD_MT $MERGE_RATIO_MT >> $OUTPUT_MICROBENCH
+#echo "28/36"
+#./hybrid_a_url $MERGE_THRESHOLD $MERGE_RATIO >> $OUTPUT_MICROBENCH
+#echo "29/36"
+#./stdmap_c_url >> $OUTPUT_MICROBENCH
+#echo "30/36"
+#./stxbtree_c_url >> $OUTPUT_MICROBENCH
+#echo "31/36"
+#./hybrid_c_url $MERGE_THRESHOLD_MT $MERGE_RATIO_MT >> $OUTPUT_MICROBENCH
+#echo "32/36"
+#./hybrid_c_url $MERGE_THRESHOLD $MERGE_RATIO >> $OUTPUT_MICROBENCH
+#echo "33/36"
+#./stdmap_e_url >> $OUTPUT_MICROBENCH
+#echo "34/36"
+#./stxbtree_e_url >> $OUTPUT_MICROBENCH
+#echo "35/36"
+#./hybrid_e_url $MERGE_THRESHOLD_MT $MERGE_RATIO_MT >> $OUTPUT_MICROBENCH
+#echo "36/36"
+#./hybrid_e_url $MERGE_THRESHOLD $MERGE_RATIO >> $OUTPUT_MICROBENCH
 

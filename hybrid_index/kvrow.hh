@@ -33,6 +33,7 @@ typedef value_string row_type;
 #else
 # include "value_bag.hh"
 typedef value_bag<uint16_t> row_type;
+//typedef value_bag<uint32_t> row_type;
 #endif
 
 template <typename R>
@@ -96,6 +97,9 @@ class query {
   void run_buildStatic(T &table, threadinfo &ti);
 
   template <typename T>
+  void run_buildStatic_quick(T &table, int nkeys, threadinfo &ti);
+
+  template <typename T>
   void run_merge(T &table, T &merge_table, threadinfo &ti, threadinfo &ti_merge);
 
   template <typename T>
@@ -106,6 +110,15 @@ class query {
 
   template <typename T>
   void run_merge_multivalue(T &table, T &merge_table, threadinfo &ti, threadinfo &ti_merge);
+
+  template <typename T>
+  void run_destroy_static_dynamicvalue(T &table, threadinfo &ti);
+
+  template <typename T>
+  void run_buildStatic_dynamicvalue(T &table, threadinfo &ti);
+
+  template <typename T>
+  void run_merge_dynamicvalue(T &table, T &merge_table, threadinfo &ti, threadinfo &ti_merge);
   //================================================================================
 
   private:
@@ -477,6 +490,12 @@ void query<R>::run_buildStatic(T &table, threadinfo &ti) {
 }
 
 template <typename R> template <typename T>
+void query<R>::run_buildStatic_quick(T &table, int nkeys, threadinfo &ti) {
+  typename T::unlocked_cursor_type lp(table);
+  table.set_static_root(lp.buildStatic_quick(nkeys, ti));
+}
+
+template <typename R> template <typename T>
 void query<R>::run_merge(T &table, T &merge_table, threadinfo &ti, threadinfo &ti_merge) {
   typename T::static_cursor_merge_type lp(table, merge_table);
   lp.merge(ti, ti_merge);
@@ -499,6 +518,27 @@ void query<R>::run_buildStatic_multivalue(T &table, threadinfo &ti) {
 template <typename R> template <typename T>
 void query<R>::run_merge_multivalue(T &table, T &merge_table, threadinfo &ti, threadinfo &ti_merge) {
   typename T::static_cursor_merge_multivalue_type lp(table, merge_table);
+  lp.merge(ti, ti_merge);
+  table.set_static_root(lp.get_root());
+}
+
+
+template <typename R> template <typename T>
+void query<R>::run_destroy_static_dynamicvalue(T &table, threadinfo &ti) {
+  typename T::static_dynamicvalue_cursor_type lp(table);
+  lp.destroy(ti);
+  table.set_static_root(NULL);
+}
+
+template <typename R> template <typename T>
+void query<R>::run_buildStatic_dynamicvalue(T &table, threadinfo &ti) {
+  typename T::unlocked_cursor_type lp(table);
+  table.set_static_root(lp.buildStaticDynamicvalue(ti));
+}
+
+template <typename R> template <typename T>
+void query<R>::run_merge_dynamicvalue(T &table, T &merge_table, threadinfo &ti, threadinfo &ti_merge) {
+  typename T::static_cursor_merge_dynamicvalue_type lp(table, merge_table);
   lp.merge(ti, ti_merge);
   table.set_static_root(lp.get_root());
 }

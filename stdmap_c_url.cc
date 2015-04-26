@@ -8,7 +8,7 @@ int main() {
   //MapType_str::const_iterator stdmap_keyIter;
 
   int64_t memory = 0;
-  AllocatorType *alloc = new AllocatorType(&memory);
+  AllocatorType_str *alloc = new AllocatorType_str(&memory);
 
   MapType_str_alloc *stdmap = new MapType_str_alloc(std::less<std::string>(), (*alloc));
   MapType_str_alloc::const_iterator stdmap_keyIter;
@@ -39,6 +39,7 @@ int main() {
     count++;
   }
 
+  //std::cout << "start\n";
   //initial load
   //WRITE ONLY TEST
   count = 0;
@@ -50,6 +51,8 @@ int main() {
       std::cout << "LOAD FAIL!\n";
       return -1;
     }
+    //if ((count % 1000000) == 0)
+    //std::cout << count << "\n";
     count++;
     value++;
   }
@@ -57,6 +60,7 @@ int main() {
 
   double tput = count / (end_time - start_time) / 1000000; //Mops/sec
   //std::cout << tput << "\n";
+  //std::cout << "stdmap " << "url " << "string memory " << (memory_string + 0.0)/1000000 << "\n";
   std::cout << "stdmap " << "url " << "memory " << (memory + memory_string + 0.0)/1000000 << "\n";
 
   //load txns

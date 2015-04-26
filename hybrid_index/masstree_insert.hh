@@ -121,6 +121,21 @@ node_base<P>* tcursor<P>::check_leaf_new_layer(nodeversion_type v,
         n_->lv_[kp_] = nl;
     n_->keylenx_[kp_] = n_->layer_keylenx;
     updated_v_ = n_->full_unlocked_version_value();
+    /*
+    //huanchen
+    //WGC
+    if (n_->ksuf_) {
+      permuter_type permut(n_->permutation_);
+      for (int i = 0; i < permut.size(); i++) {
+	if (n_->has_ksuf(permut[i]))
+	  goto after_gc;
+      }
+      ti.deallocate(n_->ksuf_, (int)(n_->ksuf_allocated_size()), memtag_masstree_ksuffixes);
+      n_->ksuf_ = NULL;
+    }
+
+ after_gc:
+    */
     n_->unlock(v);
     n_ = nl;
     ki_ = kp_ = kc < 0;

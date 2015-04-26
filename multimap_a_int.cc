@@ -1,11 +1,17 @@
 #include "microbench.hh"
 
-int main(int argc, char *argv[]) {
+int main() {
   std::ifstream infile_load("workloads/loada_zipf_int_100M.dat");
   std::ifstream infile_txn("workloads/txnsa_zipf_int_100M.dat");
 
-  HybridType hybrid;
-  hybrid.setup(KEY_LEN, false);
+  //MapType stdmap;
+  //MapType::const_iterator stdmap_keyIter;
+
+  int64_t memory = 0;
+  AllocatorType *alloc = new AllocatorType(&memory);
+
+  MapType_multi_alloc *multimap = new MapType_multi_alloc(std::less<uint64_t>(), (*alloc));
+  std::pair<MapType_multi_alloc::const_iterator, MapType_multi_alloc::const_iterator> multimap_keyIter;
 
   std::string op;
   uint64_t key;
@@ -21,7 +27,7 @@ int main(int argc, char *argv[]) {
   int count = 0;
   uint64_t value = 0;
   //read init file
-  while ((count < INIT_LIMIT) && infile_load.good()) {
+  while ((count < INIT_LIMIT) && infile_txn.good()) {
     infile_load >> op >> key;
     if (op.compare(insert) != 0) {
       std::cout << "READING LOAD FILE FAIL!\n";
@@ -31,36 +37,23 @@ int main(int argc, char *argv[]) {
     count++;
   }
 
-  //hybrid.set_merge_threshold(1000001); //hack
-  //hybrid.set_merge_ratio(0); //hack
-
   //initial load
   //WRITE ONLY TEST
   count = 0;
   double start_time = get_now();
   while (count < (int)init_keys.size()) {
-    uint64_t* key_ptr = &(init_keys[count]);
-    uint64_t* value_ptr = &value;
-    if (!hybrid.put_uv((const char*)key_ptr, 8, (const char*)value_ptr, 8)) {
-      std::cout << "LOAD FAIL!\n";
-      return -1;
+    for (int i = 0; i < VALUES_PER_KEY; i++) {
+      multimap->insert(std::pair<uint64_t, uint64_t>(init_keys[count], value));
+      value++;
     }
     count++;
-    value++;
   }
   double end_time = get_now();
 
-  double tput = count / (end_time - start_time) / 1000000; //Mops/sec
-
-  if (HYBRID > 0)
-    std::cout << "hybrid ";
-  else if (HYBRID < 0)
-    std::cout << "mt ";
-  else
-    std::cout << "cmt ";
-  std::cout << "int " << "insert " << tput << "\n";
-  //std::cout << "hybrid " << "int " << "memory " << memory << "\n";
-
+  double tput = count * VALUES_PER_KEY / (end_time - start_time) / 1000000; //Mops/sec
+  //std::cout << tput << "\n";
+  std::cout << "multimap " << "int " << "insert " << tput << "\n";
+  //std::cout << "stdmap " << "int " << "memory " << (memory + 0.0) << "\n";
 
   //load txns
   count = 0;
@@ -81,24 +74,22 @@ int main(int argc, char *argv[]) {
     count++;
   }
 
-  if (HYBRID >= 0)
-    hybrid.merge(); //hack
-
-  //DO TXNS
+  //READ
   start_time = get_now();
   int txn_num = 0;
-  value = 0;
-  Str val;
+  uint64_t sum;
   while ((txn_num < LIMIT) && (txn_num < (int)ops.size())) {
-    uint64_t* key_ptr = &(keys[txn_num]);
     if (ops[txn_num] == 1) { //READ
-      if (!hybrid.get((const char*)key_ptr, 8, val)) {
+      //stdmap_keyIter = stdmap->find(keys[txn_num]);
+      multimap_keyIter = multimap->equal_range(keys[txn_num]);
+      if (multimap_keyIter.first == multimap_keyIter.second) {
 	std::cout << "READ FAIL\n";
       }
     }
     else if (ops[txn_num] == 2) { //UPDATE
-      uint64_t* value_ptr = &value;
-      hybrid.put((const char*)key_ptr, 8, (const char*)value_ptr, 8);
+      multimap_keyIter = multimap->equal_range(keys[txn_num]);
+      multimap->erase(multimap_keyIter.first);
+      multimap->insert(std::pair<uint64_t, uint64_t>(keys[count], value));
       value++;
     }
     else {
@@ -109,20 +100,9 @@ int main(int argc, char *argv[]) {
   }
   end_time = get_now();
 
-  //std::cout << hybrid.get_ic() << " " << hybrid.get_sic() << "\n";
-
   tput = txn_num / (end_time - start_time) / 1000000; //Mops/sec
-  if (HYBRID > 0)
-    std::cout << "hybrid ";
-  else if (HYBRID < 0)
-    std::cout << "mt ";
-  else
-    std::cout << "cmt ";
-  std::cout << "int " << "read/update " << tput << "\n";
+  std::cout << "multimap " << "int " << "read/update " << tput << "\n";
   //std::cout << "time elapsed = " << (end_time - start_time) << "\n";
-
-  //std::cout << "hybrid " << "int " << "dynamichit " << hybrid.get_mt_hit() << "\n";
-  //std::cout << "hybrid " << "int " << "statichit " << hybrid.get_cmt_hit() << "\n";
 
   return 0;
 }

@@ -30,7 +30,7 @@ class value_bag {
     union bagdata {
         struct {
             offset_type ncol_;
-            offset_type pos_[1];
+	    offset_type pos_[1];
         };
         char s_[0];
     };

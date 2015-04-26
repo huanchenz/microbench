@@ -1,13 +1,11 @@
 #include "microbench.hh"
 
 int main(int argc, char *argv[]) {
-  int merge_threshold = atoi(argv[1]);
-  int merge_ratio = atoi(argv[2]);
   std::ifstream infile_load("workloads/loade_zipf_int_100M.dat");
   std::ifstream infile_txn("workloads/txnse_zipf_int_100M.dat");
 
   HybridType hybrid;
-  hybrid.setup(KEY_LEN, false, merge_threshold, merge_ratio);
+  hybrid.setup(KEY_LEN, KEY_LEN, false);
 
   std::string op;
   uint64_t key;
@@ -75,7 +73,7 @@ int main(int argc, char *argv[]) {
     count++;
   }
 
-  if (merge_threshold <= INIT_LIMIT)
+  if (HYBRID >= 0)
     hybrid.merge(); //hack
 
   //SCAN/INSERT
@@ -86,10 +84,12 @@ int main(int argc, char *argv[]) {
   while ((txn_num < LIMIT) && (txn_num < (int)ops.size())) {
     uint64_t* key_ptr = &(keys[txn_num]);
     if (ops[txn_num] == 0) { //INSERT
+
       uint64_t* value_ptr = &value;
       if (!hybrid.put_uv((const char*)key_ptr, 8, (const char*)value_ptr, 8)) {
 	std::cout << "INSERT FAIL!\n";
       }
+
       value++;
     }
     else if (ops[txn_num] == 1) { //SCAN
@@ -112,12 +112,13 @@ int main(int argc, char *argv[]) {
   end_time = get_now();
 
   tput = txn_num / (end_time - start_time) / 1000000; //Mops/sec
-  if (merge_threshold > INIT_LIMIT)
-    std::cout << "mt ";
-  else if (merge_threshold == INIT_LIMIT)
-    std::cout << "smt ";
-  else
+
+  if (HYBRID > 0)
     std::cout << "hybrid ";
+  else if (HYBRID < 0)
+    std::cout << "mt ";
+  else
+    std::cout << "cmt ";
   std::cout << "int " << "scan " << tput << "\n";
   //std::cout << "time elapsed = " << (end_time - start_time) << "\n";
 

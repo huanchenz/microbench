@@ -49,6 +49,14 @@ public:
     return dataPtr;
   }
 
+  pointer allocate(size_type size, void* ptr) {
+    pointer dataPtr = BaseAllocator::allocate(size, ptr);
+    *memory_size += size * sizeof(ValueType);
+    //VOLT_TRACE("allocate +++++++ %p %lu.\n", dataPtr, size * sizeof(ValueType));
+    //VOLT_TRACE("%s\n", typeid(ValueType).name());
+    return dataPtr;
+  }
+
   pointer allocate(size_type size, pointer ptr) {
     pointer dataPtr = BaseAllocator::allocate(size, ptr);
     *memory_size += size * sizeof(ValueType);
@@ -61,7 +69,7 @@ public:
     BaseAllocator::deallocate(ptr, size);
     *memory_size -= size * sizeof(ValueType);
   }
-
+  /*
   void construct(pointer __ptr, const ValueType& __val) {
     new(__ptr) ValueType(__val);
     //VOLT_TRACE("construct +++++++ %p %lu.\n", __ptr, sizeof(ValueType));
@@ -74,4 +82,5 @@ public:
     __ptr->~ValueType();
     *memory_size -= sizeof(ValueType);
   }
+  */
 };

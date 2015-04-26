@@ -21,7 +21,10 @@
 namespace Masstree {
 template <typename P> struct gc_layer_rcu_callback;
 
-  //huanchen-static
+//huanchen-static
+//**********************************************************************************
+// stcursor
+//**********************************************************************************
 template <typename P>
 class stcursor {
 public:
@@ -29,6 +32,8 @@ public:
   typedef key<typename P::ikey_type> key_type;
   typedef typename P::threadinfo_type threadinfo;
 
+  inline stcursor() {
+  }
   inline stcursor(const basic_table<P>& table)
     : root_(table.static_root()) {
   }
@@ -60,6 +65,18 @@ public:
     : ka_(reinterpret_cast<const char*>(s), len),
       root_(table.static_root()) {
   }
+
+  void setup_cursor(const basic_table<P>& table) {
+    root_ = table.static_root();
+  }
+  void setup_cursor(const basic_table<P>& table, Str str) {
+    ka_ = str;
+    root_ = table.static_root();
+  }
+  void setup_cursor(basic_table<P>& table, Str str) {
+    ka_ = str;
+    root_ = table.static_root();
+  }
   
   bool find();
   bool remove();
@@ -85,7 +102,11 @@ private:
   inline int lower_bound_binary() const;
 };
 
-  //huanchen-static-multivalue
+
+//huanchen-static-multivalue
+//**********************************************************************************
+// stcursor_multivalue
+//**********************************************************************************
 template <typename P>
 class stcursor_multivalue {
 public:
@@ -93,6 +114,8 @@ public:
   typedef key<typename P::ikey_type> key_type;
   typedef typename P::threadinfo_type threadinfo;
 
+  inline stcursor_multivalue() {
+  }
   inline stcursor_multivalue(const basic_table<P>& table)
     : root_(table.static_root()) {
   }
@@ -125,6 +148,18 @@ public:
       root_(table.static_root()) {
   }
   
+  void setup_cursor(const basic_table<P>& table) {
+    root_ = table.static_root();
+  }
+  void setup_cursor(const basic_table<P>& table, Str str) {
+    ka_ = str;
+    root_ = table.static_root();
+  }
+  void setup_cursor(basic_table<P>& table, Str str) {
+    ka_ = str;
+    root_ = table.static_root();
+  }
+
   bool find();
   bool remove();
 
@@ -160,7 +195,93 @@ private:
   inline int lower_bound_binary() const;
 };
 
-  //huanchen-static
+
+//huanchen-static-dynamicvalue
+//**********************************************************************************
+// stcursor_dynamicvalue
+//**********************************************************************************
+template <typename P>
+class stcursor_dynamicvalue {
+public:
+  typedef typename P::value_type value_type;
+  typedef key<typename P::ikey_type> key_type;
+  typedef typename P::threadinfo_type threadinfo;
+
+  inline stcursor_dynamicvalue() {
+  }
+  inline stcursor_dynamicvalue(const basic_table<P>& table)
+    : root_(table.static_root()) {
+  }
+  inline stcursor_dynamicvalue(const basic_table<P>& table, Str str)
+    : ka_(str),
+      root_(table.static_root()) {
+  }
+  inline stcursor_dynamicvalue(basic_table<P>& table, Str str)
+    : ka_(str),
+      root_(table.static_root()) {
+  }
+  inline stcursor_dynamicvalue(const basic_table<P>& table,
+		 const char* s, int len)
+    : ka_(s, len),
+      root_(table.static_root()) {
+  }
+  inline stcursor_dynamicvalue(basic_table<P>& table,
+		 const char* s, int len)
+    : ka_(s, len),
+      root_(table.static_root()) {
+  }
+  inline stcursor_dynamicvalue(const basic_table<P>& table,
+		 const unsigned char* s, int len)
+    : ka_(reinterpret_cast<const char*>(s), len),
+      root_(table.static_root()) {
+  }
+  inline stcursor_dynamicvalue(basic_table<P>& table,
+		 const unsigned char* s, int len)
+    : ka_(reinterpret_cast<const char*>(s), len),
+      root_(table.static_root()) {
+  }
+
+  void setup_cursor(const basic_table<P>& table) {
+    root_ = table.static_root();
+  }
+  void setup_cursor(const basic_table<P>& table, Str str) {
+    ka_ = str;
+    root_ = table.static_root();
+  }
+  void setup_cursor(basic_table<P>& table, Str str) {
+    ka_ = str;
+    root_ = table.static_root();
+  }
+
+  bool find();
+  bool remove(threadinfo &ti);
+
+  void destroy(threadinfo &ti);
+
+  //int tree_size();
+  
+  inline value_type &value() const {
+    return lv_->value();
+  }
+
+  inline massnode_dynamicvalue<P>* node() const {
+    return n_;
+  }
+
+private:
+  key_type ka_;
+  leafvalue<P>* lv_;
+  massnode_dynamicvalue<P>* n_;
+  node_base<P>* root_;
+  
+  inline int lower_bound_binary() const;
+};
+
+
+//huanchen-static
+//**********************************************************************************
+// stcursor_scan
+//**********************************************************************************
 template <typename P>
 class stcursor_scan {
 public:
@@ -169,6 +290,8 @@ public:
   typedef key<typename P::ikey_type> key_type;
   typedef typename P::threadinfo_type threadinfo;
 
+  inline stcursor_scan() {
+  }
   inline stcursor_scan(const basic_table<P>& table)
     : root_(table.static_root()) {
   }
@@ -201,9 +324,35 @@ public:
       root_(table.static_root()) {
   }
   
+  void setup_cursor(const basic_table<P>& table) {
+    root_ = table.static_root();
+    nodeTrace_.clear();
+    posTrace_.clear();
+    cur_key_prefix_.clear();
+    next_key_prefix_.clear();
+  }
+  void setup_cursor(const basic_table<P>& table, Str str) {
+    ka_ = str;
+    root_ = table.static_root();
+    nodeTrace_.clear();
+    posTrace_.clear();
+    cur_key_prefix_.clear();
+    next_key_prefix_.clear();
+  }
+  void setup_cursor(basic_table<P>& table, Str str) {
+    ka_ = str;
+    root_ = table.static_root();
+    nodeTrace_.clear();
+    posTrace_.clear();
+    cur_key_prefix_.clear();
+    next_key_prefix_.clear();
+  }
+
   bool find_upper_bound_or_equal();
   bool find_upper_bound();
   bool find_next();
+  bool find_next1();
+  bool find_next2();
 
   inline const char* cur_value() const{
     return (const char*)cur_lv_->value();
@@ -238,6 +387,17 @@ public:
     memcpy(retKey + (size * sizeof(ikey_type)), next_key_suffix_.s, next_key_suffix_.len);
     return retKey;
   }
+  inline void next_key(char* nextKey) {
+    int size = next_key_prefix_.size();
+    int len = sizeof(ikey_type) * size + next_key_suffix_.len;
+    for (int i = 0; i < size; i++)
+      for (int j = 0; j < sizeof(ikey_type); j++)
+	nextKey[i* sizeof(ikey_type) + j] 
+	  = (reinterpret_cast<char*>(&(next_key_prefix_[i])))[sizeof(ikey_type) - 1 - j];
+
+    if (next_key_suffix_.len > 0)
+      memcpy(nextKey + (size * sizeof(ikey_type)), next_key_suffix_.s, next_key_suffix_.len);
+  }
   inline int cur_keylen() const {
     return (sizeof(ikey_type) * cur_key_prefix_.size() + cur_key_suffix_.len);
   }
@@ -249,6 +409,7 @@ private:
   key_type ka_;
   massnode<P>* n_;
   node_base<P>* root_;
+  int kp_;
 
   std::vector<massnode<P>*> nodeTrace_;
   std::vector<int> posTrace_;
@@ -267,11 +428,17 @@ private:
   inline bool find_leftmost();
   inline bool next_item(int kp);
   inline bool next_item_next(int kp);
+  inline bool next_item_next();
   inline bool next_item_from_next_node(int kp);
   inline bool next_item_from_next_node_next(int kp);
+  inline bool next_item_from_next_node_next();
 };
 
-  //huanchen-static-multivalue
+
+//huanchen-static-multivalue
+//**********************************************************************************
+// stcursor_scan_multivalue
+//**********************************************************************************
 template <typename P>
 class stcursor_scan_multivalue {
 public:
@@ -280,6 +447,8 @@ public:
   typedef key<typename P::ikey_type> key_type;
   typedef typename P::threadinfo_type threadinfo;
 
+  inline stcursor_scan_multivalue() {
+  }
   inline stcursor_scan_multivalue(const basic_table<P>& table)
     : root_(table.static_root()) {
   }
@@ -312,6 +481,18 @@ public:
       root_(table.static_root()) {
   }
   
+  void setup_cursor(const basic_table<P>& table) {
+    root_ = table.static_root();
+  }
+  void setup_cursor(const basic_table<P>& table, Str str) {
+    ka_ = str;
+    root_ = table.static_root();
+  }
+  void setup_cursor(basic_table<P>& table, Str str) {
+    ka_ = str;
+    root_ = table.static_root();
+  }
+
   bool find_upper_bound_or_equal();
   bool find_upper_bound();
   bool find_next();
@@ -396,7 +577,171 @@ private:
   inline bool next_item_from_next_node_next(int kp);
 };
 
-  //huanchen-static-merge
+
+
+//huanchen-static-dynamicvalue
+//**********************************************************************************
+// stcursor_scan_dynamicvalue
+//**********************************************************************************
+template <typename P>
+class stcursor_scan_dynamicvalue {
+public:
+  typedef typename P::value_type value_type;
+  typedef typename P::ikey_type ikey_type;
+  typedef key<typename P::ikey_type> key_type;
+  typedef typename P::threadinfo_type threadinfo;
+
+  inline stcursor_scan_dynamicvalue() {
+  }
+  inline stcursor_scan_dynamicvalue(const basic_table<P>& table)
+    : root_(table.static_root()) {
+  }
+  inline stcursor_scan_dynamicvalue(const basic_table<P>& table, Str str)
+    : ka_(str),
+      root_(table.static_root()) {
+  }
+  inline stcursor_scan_dynamicvalue(basic_table<P>& table, Str str)
+    : ka_(str),
+      root_(table.static_root()) {
+  }
+  inline stcursor_scan_dynamicvalue(const basic_table<P>& table,
+		 const char* s, int len)
+    : ka_(s, len),
+      root_(table.static_root()) {
+  }
+  inline stcursor_scan_dynamicvalue(basic_table<P>& table,
+		 const char* s, int len)
+    : ka_(s, len),
+      root_(table.static_root()) {
+  }
+  inline stcursor_scan_dynamicvalue(const basic_table<P>& table,
+		 const unsigned char* s, int len)
+    : ka_(reinterpret_cast<const char*>(s), len),
+      root_(table.static_root()) {
+  }
+  inline stcursor_scan_dynamicvalue(basic_table<P>& table,
+		 const unsigned char* s, int len)
+    : ka_(reinterpret_cast<const char*>(s), len),
+      root_(table.static_root()) {
+  }
+  
+  void setup_cursor(const basic_table<P>& table) {
+    root_ = table.static_root();
+    nodeTrace_.clear();
+    posTrace_.clear();
+    cur_key_prefix_.clear();
+    next_key_prefix_.clear();
+  }
+  void setup_cursor(const basic_table<P>& table, Str str) {
+    ka_ = str;
+    root_ = table.static_root();
+    nodeTrace_.clear();
+    posTrace_.clear();
+    cur_key_prefix_.clear();
+    next_key_prefix_.clear();
+  }
+  void setup_cursor(basic_table<P>& table, Str str) {
+    ka_ = str;
+    root_ = table.static_root();
+    nodeTrace_.clear();
+    posTrace_.clear();
+    cur_key_prefix_.clear();
+    next_key_prefix_.clear();
+  }
+
+  bool find_upper_bound_or_equal();
+  bool find_upper_bound();
+  bool find_next();
+  bool find_next1();
+  bool find_next2();
+
+  inline value_type cur_value() {
+    return cur_lv_->value();
+  }
+  inline value_type next_value() {
+    return next_lv_->value();
+  }
+
+  inline massnode_dynamicvalue<P>* node() const {
+    return n_;
+  }
+  inline char* cur_key() {
+    int size = cur_key_prefix_.size();
+    int len = sizeof(ikey_type) * size + cur_key_suffix_.len;
+    char *retKey = (char*)malloc(len + 1);
+    for (int i = 0; i < size; i++)
+      for (int j = 0; j < sizeof(ikey_type); j++)
+	retKey[i* sizeof(ikey_type) + j] 
+	  = (reinterpret_cast<char*>(&(cur_key_prefix_[i])))[sizeof(ikey_type) - 1 - j];
+
+    memcpy(retKey + (size * sizeof(ikey_type)), cur_key_suffix_.s, cur_key_suffix_.len);
+    return retKey;
+  }
+  inline char* next_key() {
+    int size = next_key_prefix_.size();
+    int len = sizeof(ikey_type) * size + next_key_suffix_.len;
+    char *retKey = (char*)malloc(len + 1);
+    for (int i = 0; i < size; i++)
+      for (int j = 0; j < sizeof(ikey_type); j++)
+	retKey[i* sizeof(ikey_type) + j] 
+	  = (reinterpret_cast<char*>(&(next_key_prefix_[i])))[sizeof(ikey_type) - 1 - j];
+
+    memcpy(retKey + (size * sizeof(ikey_type)), next_key_suffix_.s, next_key_suffix_.len);
+    return retKey;
+  }
+  inline void next_key(char* nextKey) {
+    int size = next_key_prefix_.size();
+    int len = sizeof(ikey_type) * size + next_key_suffix_.len;
+    for (int i = 0; i < size; i++)
+      for (int j = 0; j < sizeof(ikey_type); j++)
+	nextKey[i* sizeof(ikey_type) + j] 
+	  = (reinterpret_cast<char*>(&(next_key_prefix_[i])))[sizeof(ikey_type) - 1 - j];
+
+    if (next_key_suffix_.len > 0)
+      memcpy(nextKey + (size * sizeof(ikey_type)), next_key_suffix_.s, next_key_suffix_.len);
+  }
+  inline int cur_keylen() const {
+    return (sizeof(ikey_type) * cur_key_prefix_.size() + cur_key_suffix_.len);
+  }
+  inline int next_keylen() const {
+    return (sizeof(ikey_type) * next_key_prefix_.size() + next_key_suffix_.len);
+  }
+
+private:
+  key_type ka_;
+  massnode_dynamicvalue<P>* n_;
+  node_base<P>* root_;
+  int kp_;
+
+  std::vector<massnode_dynamicvalue<P>*> nodeTrace_;
+  std::vector<int> posTrace_;
+  std::vector<ikey_type> cur_key_prefix_;
+  Str cur_key_suffix_;
+  leafvalue<P>* cur_lv_;
+  std::vector<ikey_type> next_key_prefix_;
+  Str next_key_suffix_;
+  leafvalue<P>* next_lv_;
+
+  bool isExact_;
+  
+  inline int lower_bound_binary() const;
+  inline int upper_bound_or_equal_binary();
+  inline bool find_next_leftmost();
+  inline bool find_leftmost();
+  inline bool next_item(int kp);
+  inline bool next_item_next(int kp);
+  inline bool next_item_next();
+  inline bool next_item_from_next_node(int kp);
+  inline bool next_item_from_next_node_next(int kp);
+  inline bool next_item_from_next_node_next();
+};
+
+
+
+//huanchen-static-merge
+//**********************************************************************************
+// stcursor_merge
+//**********************************************************************************
 template <typename P>
 class stcursor_merge {
 public:
@@ -456,7 +801,11 @@ private:
   inline uint8_t convert_to_ikeylen(uint32_t len);
 };
 
-  //huanchen-static-merge
+
+//huanchen-static-merge
+//**********************************************************************************
+// stcursor_merge_multivalue
+//**********************************************************************************
 template <typename P>
 class stcursor_merge_multivalue {
 public:
@@ -520,6 +869,72 @@ private:
   inline uint8_t convert_to_ikeylen(uint32_t len);
 };
 
+
+//huanchen-static-merge
+//**********************************************************************************
+// stcursor_merge_dynamicvalue
+//**********************************************************************************
+template <typename P>
+class stcursor_merge_dynamicvalue {
+public:
+  typedef typename P::value_type value_type;
+  typedef typename P::ikey_type ikey_type;
+  typedef key<typename P::ikey_type> key_type;
+  typedef typename P::threadinfo_type threadinfo;
+
+  //task 0: merge m to n
+  //task 1: merge item_m to n
+  //task 2: create a new massnode to include item_m & item_n
+  struct merge_task_dynamicvalue {
+    uint8_t task;
+    massnode_dynamicvalue<P>* parent_node;
+    uint32_t parent_node_pos;
+    massnode_dynamicvalue<P>* m;
+    massnode_dynamicvalue<P>* n;
+    uint8_t ikeylen_m;
+    uint8_t ikeylen_n;
+    ikey_type ikey_m;
+    ikey_type ikey_n;
+    leafvalue<P> lv_m;
+    leafvalue<P> lv_n;
+    char* ksuf_m;
+    char* ksuf_n;
+    uint32_t ksuf_len_m;
+    uint32_t ksuf_len_n;
+  };
+
+  //inline stcursor_merge(const basic_table<P>& table, const basic_table<P>& merge_table)
+  inline stcursor_merge_dynamicvalue(basic_table<P>& table, basic_table<P>& merge_table)
+    : root_(table.static_root()), 
+      merge_root_(merge_table.static_root()) {
+  }
+
+  inline node_base<P>* get_root() const {
+    return root_;
+  }
+
+  bool merge(threadinfo &ti, threadinfo &ti_merge);
+  bool merge_nodes(merge_task_dynamicvalue t, threadinfo &ti, threadinfo &ti_merge);
+  bool add_item_to_node(merge_task_dynamicvalue t, threadinfo &ti);
+  bool create_node(merge_task_dynamicvalue t, threadinfo &ti);
+
+private:
+  key_type ka_;
+  massnode_dynamicvalue<P>* n_;
+  massnode_dynamicvalue<P>* m_;
+  node_base<P>* root_;
+  node_base<P>* merge_root_;
+
+  std::vector<massnode_dynamicvalue<P>*> nodeTrace_;
+  std::vector<int> posTrace_;
+
+  std::vector<merge_task_dynamicvalue> task_;
+
+  inline uint8_t convert_to_ikeylen(uint32_t len);
+};
+
+
+
 template <typename P>
 class unlocked_tcursor {
   public:
@@ -529,11 +944,13 @@ class unlocked_tcursor {
     typedef typename leaf<P>::nodeversion_type nodeversion_type;
     typedef typename nodeversion_type::value_type nodeversion_value_type;
 
-  //huanchen-static
-  typedef leafvalue_static<P> leafvalue_static_type;
-  //huanchen-static-multivalue
-  typedef leafvalue_static_multivalue<P> leafvalue_static_multivalue_type;
+    //huanchen-static
+    typedef leafvalue_static<P> leafvalue_static_type;
+    //huanchen-static-multivalue
+    typedef leafvalue_static_multivalue<P> leafvalue_static_multivalue_type;
 
+    inline unlocked_tcursor() {
+    }
     inline unlocked_tcursor(const basic_table<P>& table)
         : lv_(leafvalue<P>::make_empty()),
           root_(table.root()) {
@@ -572,6 +989,18 @@ class unlocked_tcursor {
     : lv_(leafvalue<P>::make_empty()), root_(table.root()) {
   }
   */
+    void setup_cursor(const basic_table<P>& table, Str str) {
+      ka_ = str;
+      lv_ = leafvalue<P>::make_empty();
+      root_ = table.root();
+    }
+
+    void setup_cursor(basic_table<P>& table, Str str) {
+      ka_ = str;
+      lv_ = leafvalue<P>::make_empty();
+      root_ = table.fix_root();
+    }
+
     bool find_unlocked(threadinfo& ti);
 
     inline value_type value() const {
@@ -585,12 +1014,15 @@ class unlocked_tcursor {
         return (v_.version_value() << leaf<P>::permuter_type::size_bits) + perm_.size();
     }
 
-  //huanchen-static
-  massnode<P> *buildStatic(threadinfo &ti);
-  //huanchen-static-multivalue
-  massnode_multivalue<P> *buildStaticMultivalue(threadinfo &ti);
+    //huanchen-static
+    massnode<P> *buildStatic(threadinfo &ti);
+    massnode<P> *buildStatic_quick(int nkeys, threadinfo &ti);
+    //huanchen-static-multivalue
+    massnode_multivalue<P> *buildStaticMultivalue(threadinfo &ti);
+    //huanchen-static-dynamicvalue
+    massnode_dynamicvalue<P> *buildStaticDynamicvalue(threadinfo &ti);
 
-  void stats(threadinfo &ti, std::vector<uint32_t> &nkeys_stats); //huanchen-stats
+    void stats(threadinfo &ti, std::vector<uint32_t> &nkeys_stats); //huanchen-stats
 
   private:
     leaf<P>* n_;
@@ -621,6 +1053,8 @@ class tcursor {
     static constexpr int new_nodes_size = 1; // unless we make a new trie newnodes will have at most 1 item
     typedef local_vector<std::pair<leaf_type*, nodeversion_value_type>, new_nodes_size> new_nodes_type;
 
+    tcursor() {
+    }
     tcursor(basic_table<P>& table, Str str)
         : ka_(str), root_(table.fix_root()) {
     }
@@ -637,6 +1071,10 @@ class tcursor {
         : ka_(reinterpret_cast<const char*>(s), len), root_(root) {
     }
 
+    void setup_cursor(basic_table<P>& table, Str str) {
+      ka_ = str;
+      root_ = table.fix_root();
+    }
     inline bool has_value() const {
         return kp_ >= 0;
     }

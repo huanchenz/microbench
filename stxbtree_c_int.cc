@@ -3,6 +3,8 @@
 int main() {
   std::ifstream infile_load("workloads/loadc_zipf_int_100M.dat");
   std::ifstream infile_txn("workloads/txnsc_zipf_int_100M.dat");
+  //std::ifstream infile_load("workloads/loadc_zipf_int_1M.dat");
+  //std::ifstream infile_txn("workloads/txnsc_zipf_int_1M.dat");
 
   //BtreeType stxbtree;
   //BtreeType::const_iterator stxbtree_keyIter;

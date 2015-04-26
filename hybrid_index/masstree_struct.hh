@@ -489,6 +489,16 @@ class leaf : public node_base<P> {
         ti.pool_deallocate_rcu(this, allocated_size(), memtag_masstree_leaf);
     }
 
+  //huanchen
+  /*
+  size_t ksuf_allocated_size() const {
+    if (extrasize64_ <= 0)
+      return ksuf_ ? ksuf_->capacity() : 0;
+    else
+      return iksuf_[0].capacity();
+  }
+  */
+
   private:
     inline void mark_deleted_layer() {
         modstate_ = modstate_deleted_layer;
@@ -779,6 +789,9 @@ inline node_base<P>* basic_table<P>::static_root() const {
 }
 
 //huanchen-static
+//**********************************************************************************
+// leafvalue_static
+//**********************************************************************************
 template <typename P>
 class leafvalue_static {
   public:
@@ -822,6 +835,9 @@ class leafvalue_static {
 
 
 //huanchen-static
+//**********************************************************************************
+// massnode
+//**********************************************************************************
 template <typename P>
 class massnode : public node_base<P> {
 public:
@@ -833,21 +849,35 @@ public:
 
   uint32_t nkeys_;
   uint32_t size_;
+  uint8_t hasKsuf_;
 
-  massnode (uint32_t nkeys, uint32_t size)
-    :node_base<P>(false), nkeys_(nkeys), size_(size) {
+  massnode (uint32_t nkeys, uint32_t size, uint8_t hasKsuf)
+    :node_base<P>(false), nkeys_(nkeys), size_(size), hasKsuf_(hasKsuf) {
 
   }
 
-  static massnode<P> *make (size_t ksufSize, uint32_t nkeys, threadinfo& ti) {
-    size_t sz = sizeof(massnode<P>) 
-      + sizeof(uint8_t) * nkeys
-      + sizeof(ikey_type) * nkeys
-      + sizeof(leafvalue_static_type) * nkeys
-      + sizeof(uint32_t) * (nkeys + 1)
-      + ksufSize;
+  static massnode<P> *make (size_t ksufSize, bool has_ksuf, uint32_t nkeys, threadinfo& ti) {
+    size_t sz;
+    if (has_ksuf) {
+      sz = sizeof(massnode<P>) 
+	+ sizeof(uint8_t) * nkeys
+	+ sizeof(ikey_type) * nkeys
+	+ sizeof(leafvalue_static_type) * nkeys
+	+ sizeof(uint32_t) * (nkeys + 1)
+	+ ksufSize;
+    }
+    else {
+      sz = sizeof(massnode<P>) 
+	+ sizeof(uint8_t) * nkeys
+	+ sizeof(ikey_type) * nkeys
+	+ sizeof(leafvalue_static_type) * nkeys;
+    }
     void *ptr = ti.allocate(sz, memtag_masstree_leaf);
-    massnode<P> *n = new(ptr) massnode<P>(nkeys, sz);
+    massnode<P>* n;
+    if (has_ksuf)
+      n = new(ptr) massnode<P>(nkeys, sz, (uint8_t)1);
+    else
+      n = new(ptr) massnode<P>(nkeys, sz, (uint8_t)0);
     return n;
   }
 
@@ -876,17 +906,23 @@ public:
     return (uint32_t*)((char*)this + sizeof(massnode<P>) 
 		       + sizeof(uint8_t) * nkeys_
 		       + sizeof(ikey_type) * nkeys_
-		       //+ sizeof(leafvalue_type) * nkeys_);
 		       + sizeof(leafvalue_static_type) * nkeys_);
   }
 
   char *get_ksuf() {
-    return (char*)((char*)this + sizeof(massnode<P>) 
-		   + sizeof(uint8_t) * nkeys_
-		   + sizeof(ikey_type) * nkeys_
-		   //+ sizeof(leafvalue_type) * nkeys_
-		   + sizeof(leafvalue_static_type) * nkeys_
-		   + sizeof(uint32_t) * (nkeys_ + 1));
+    if (hasKsuf_ == 1) {
+      return (char*)((char*)this + sizeof(massnode<P>) 
+		     + sizeof(uint8_t) * nkeys_
+		     + sizeof(ikey_type) * nkeys_
+		     + sizeof(leafvalue_static_type) * nkeys_
+		     + sizeof(uint32_t) * (nkeys_ + 1));
+    }
+    else {
+      return (char*)((char*)this + sizeof(massnode<P>) 
+		     + sizeof(uint8_t) * nkeys_
+		     + sizeof(ikey_type) * nkeys_
+		     + sizeof(leafvalue_static_type) * nkeys_);
+    }
   }
 
   //=============================================================
@@ -923,6 +959,14 @@ public:
 
   void set_size(uint32_t nkeys) {
     nkeys_ = nkeys;
+  }
+
+  bool has_ksuf() {
+    return (hasKsuf_ == 1);
+  }
+
+  void set_has_ksuf(uint8_t hasKsuf) {
+    hasKsuf_ = hasKsuf;
   }
 
   uint8_t ikeylen(int p) {
@@ -971,23 +1015,36 @@ public:
 
   //suffix================================================================================
   uint32_t ksuf_offset(int p) {
-    return get_ksuf_pos_offset()[p];
+    if (hasKsuf_ == 1)
+      return get_ksuf_pos_offset()[p];
+    else
+      return 0;
   }
 
   void set_ksuf_offset(int p, uint32_t offset) {
-    get_ksuf_pos_offset()[p] = offset;
+    if (hasKsuf_ == 1)
+      get_ksuf_pos_offset()[p] = offset;
   }
 
   uint32_t ksuflen(int p) {
-    return get_ksuf_pos_offset()[p+1] - get_ksuf_pos_offset()[p];
+    if (hasKsuf_ == 1)
+      return get_ksuf_pos_offset()[p+1] - get_ksuf_pos_offset()[p];
+    else
+      return 0;
   }
 
   char *ksufpos(int p) {
-    return (char*)(get_ksuf() + get_ksuf_pos_offset()[p]);
+    if (hasKsuf_ == 1)
+      return (char*)(get_ksuf() + get_ksuf_pos_offset()[p]);
+    else
+      return (char*)(get_ksuf());
   }
 
   bool has_ksuf(int p) {
-    return get_ksuf_pos_offset()[p] != 0;
+    if (hasKsuf_ == 1)
+      return get_ksuf_pos_offset()[p] != 0;
+    else
+      return false;
   }
 
   Str ksuf(int p) {
@@ -1031,13 +1088,21 @@ private:
 
 };
 
+
+
 //huanchen-static-multivalue
+//**********************************************************************************
+// static_multivalue_header
+//**********************************************************************************
 struct static_multivalue_header {
   uint32_t pos_offset;
   uint32_t len;
 };
 
 //huanchen-static-multivalue
+//**********************************************************************************
+// leafvalue_static_multivalue
+//**********************************************************************************
 template <typename P>
 class leafvalue_static_multivalue {
   public:
@@ -1091,7 +1156,11 @@ class leafvalue_static_multivalue {
 };
 
 
+
 //huanchen-static-multivalue
+//**********************************************************************************
+// massnode_multivalue
+//**********************************************************************************
 template <typename P>
 class massnode_multivalue : public node_base<P> {
 public:
@@ -1370,7 +1439,250 @@ public:
   //========================================================================================
 
   void deallocate(threadinfo &ti) {
-    //TODO
+    ti.deallocate(this, size_, memtag_masstree_leaf);
+  }
+
+  void prefetch(int m) {
+    ::prefetch((const char*)get_ikey0() + sizeof(ikey_type) * m);
+  }
+
+private:
+  template <typename PP> friend class tcursor;
+
+};
+
+
+
+//huanchen-static-dynamicvalue
+//**********************************************************************************
+// massnode_dynamicvalue
+//**********************************************************************************
+template <typename P>
+class massnode_dynamicvalue : public node_base<P> {
+public:
+  typedef typename P::ikey_type ikey_type;
+  typedef key<typename P::ikey_type> key_type;
+  typedef typename node_base<P>::leafvalue_type leafvalue_type;
+  typedef typename P::threadinfo_type threadinfo;
+
+  uint32_t nkeys_;
+  uint32_t size_;
+
+  massnode_dynamicvalue (uint32_t nkeys, uint32_t size)
+    :node_base<P>(false), nkeys_(nkeys), size_(size) {
+
+  }
+
+  static massnode_dynamicvalue<P> *make (size_t ksufSize, uint32_t nkeys, threadinfo& ti) {
+    size_t sz = sizeof(massnode_dynamicvalue<P>) 
+      + sizeof(uint8_t) * nkeys
+      + sizeof(ikey_type) * nkeys
+      + sizeof(leafvalue_type) * nkeys
+      + sizeof(uint32_t) * (nkeys + 1)
+      + ksufSize;
+    void *ptr = ti.allocate(sz, memtag_masstree_leaf);
+    massnode_dynamicvalue<P> *n = new(ptr) massnode_dynamicvalue<P>(nkeys, sz);
+    return n;
+  }
+
+  massnode_dynamicvalue<P> *resize (size_t sz, threadinfo &ti) {
+    return (massnode_dynamicvalue<P>*)ti.reallocate((void*)(this), size_, sz);
+  }
+
+  uint8_t *get_keylenx() {
+    return (uint8_t*)((char*)this + sizeof(massnode_dynamicvalue<P>));
+  }
+
+  ikey_type *get_ikey0() {
+    return (ikey_type*)((char*)this + sizeof(massnode_dynamicvalue<P>) 
+			+ sizeof(uint8_t) * nkeys_);
+  }
+
+  leafvalue_type *get_lv() {
+    return (leafvalue_type*)((char*)this + sizeof(massnode_dynamicvalue<P>) 
+			     + sizeof(uint8_t) * nkeys_
+			     + sizeof(ikey_type) * nkeys_);
+  }
+
+  //suffix========================================================
+  uint32_t *get_ksuf_pos_offset() {
+    return (uint32_t*)((char*)this + sizeof(massnode_dynamicvalue<P>) 
+		       + sizeof(uint8_t) * nkeys_
+		       + sizeof(ikey_type) * nkeys_
+		       + sizeof(leafvalue_type) * nkeys_);
+  }
+
+  char *get_ksuf() {
+    return (char*)((char*)this + sizeof(massnode_dynamicvalue<P>) 
+		   + sizeof(uint8_t) * nkeys_
+		   + sizeof(ikey_type) * nkeys_
+		   + sizeof(leafvalue_type) * nkeys_
+		   + sizeof(uint32_t) * (nkeys_ + 1));
+  }
+  //=============================================================
+
+  void printSMT() {
+    if (this == NULL)
+      return;
+    std::vector<massnode_dynamicvalue<P>*> node_trace;
+    node_trace.push_back(this);
+    int cur_pos = 0;
+    std::cout << "###############\n";
+    while (cur_pos < node_trace.size()) {
+      massnode_dynamicvalue<P>* cur_node = node_trace[cur_pos];
+      std::cout << "node # = " << cur_pos << "\n";
+      std::cout << "nkeys = " << cur_node->size() << "\n";
+      std::cout << "size = " << cur_node->allocated_size() << "\n";
+      int num_child = 0;
+      for (int i = 0; i < cur_node->size(); i++) {
+	if (keylenx_is_layer(cur_node->ikeylen(i))) {
+	  node_trace.push_back(static_cast<massnode_dynamicvalue<P>*>(cur_node->lv(i).layer()));
+	  num_child++;
+	}
+      }
+      //std::cout << "num_child = " << num_child << "\n";
+
+      cur_pos++;
+    }
+    std::cout << "###############\n";
+  }
+
+
+  int subtree_size() {
+    if (this ==NULL)
+      return 0;
+    std::vector<massnode_dynamicvalue<P>*> node_trace;
+    node_trace.push_back(this);
+    int cur_pos = 0;
+    int subtree_size = 0;
+    while (cur_pos < node_trace.size()) {
+      massnode_dynamicvalue<P>* cur_node = node_trace[cur_pos];
+      subtree_size += cur_node->allocated_size();
+      for (int i = 0; i < cur_node->size(); i++) {
+	if (keylenx_is_layer(cur_node->ikeylen(i)))
+	  node_trace.push_back(static_cast<massnode_dynamicvalue<P>*>(cur_node->lv(i).layer()));
+      }
+      cur_pos++;
+    }
+    return subtree_size;
+  }
+
+  size_t allocated_size() const {
+    return size_;
+  }
+
+  uint32_t size() const {
+    return nkeys_;
+  }
+
+  void set_allocated_size(size_t sz) {
+    size_ = sz;
+  }
+
+  void set_size(uint32_t nkeys) {
+    nkeys_ = nkeys;
+  }
+
+  uint8_t ikeylen(int p) {
+    return get_keylenx()[p];
+  }
+
+  void set_ikeylen(int p, uint8_t keylen) {
+    get_keylenx()[p] = keylen;
+  }
+
+  ikey_type ikey(int p) {
+    return get_ikey0()[p];
+  }
+
+  void set_ikey(int p, ikey_type ikey) {
+    get_ikey0()[p] = ikey;
+  }
+
+  leafvalue_type lv(int p) {
+    return get_lv()[p];
+  }
+
+  void set_lv(int p, leafvalue_type lv) {
+    get_lv()[p] = lv;
+  }
+
+  key_type get_key(int p) {
+    int kl = get_keylenx()[p];
+    if (!keylenx_has_ksuf(kl))
+      return key_type(get_ikey0()[p], kl);
+    else
+      return key_type(get_ikey0()[p], ksuf(p));
+  }
+
+  static bool keylenx_is_layer(int keylenx) {
+    return keylenx > 63;
+  }
+
+  void invalidate(int p) {
+    set_ikeylen(p, (uint8_t)0);
+  }
+
+  bool isValid(int p) {
+    return (ikeylen(p) != 0);
+  }
+
+  //suffix================================================================================
+  uint32_t ksuf_offset(int p) {
+    return get_ksuf_pos_offset()[p];
+  }
+
+  void set_ksuf_offset(int p, uint32_t offset) {
+    get_ksuf_pos_offset()[p] = offset;
+  }
+
+  uint32_t ksuflen(int p) {
+    return get_ksuf_pos_offset()[p+1] - get_ksuf_pos_offset()[p];
+  }
+
+  char *ksufpos(int p) {
+    return (char*)(get_ksuf() + get_ksuf_pos_offset()[p]);
+  }
+
+  bool has_ksuf(int p) {
+    return get_ksuf_pos_offset()[p] != 0;
+  }
+
+  Str ksuf(int p) {
+    return Str(ksufpos(p), ksuflen(p));
+  }
+
+  static int keylenx_ikeylen(int keylenx) {
+    return keylenx & 31;
+  }
+
+  static uint8_t keylenx_ikeylen(uint8_t keylenx) {
+    return keylenx & (uint8_t)31;
+  }
+
+  static bool keylenx_has_ksuf(int keylenx) {
+    return keylenx == (int)sizeof(ikey_type) + 1;
+  }
+
+  bool ksuf_equals(int p, const key_type &ka, int keylenx) {
+    return !keylenx_has_ksuf(keylenx) || equals_sloppy(p, ka);
+  }
+
+  bool equals_sloppy(int p, const key_type &ka) {
+    Str kp_str = ksuf(p);
+    if (kp_str.len != ka.suffix().len)
+      return false;
+    return string_slice<uintptr_t>::equals_sloppy(kp_str.s, ka.suffix().s, ka.suffix().len);
+  }
+  //========================================================================================
+
+  void deallocate(threadinfo &ti) {
+    /*
+    for (int i = 0; i < nkeys_; i++) {
+      if (isValid(i))
+	lv(i).value()->deallocate_rcu(ti);
+    }
+    */
     ti.deallocate(this, size_, memtag_masstree_leaf);
   }
 

@@ -39,6 +39,7 @@ int main() {
     count++;
   }
 
+  //std::cout << "start\n";
   //initial load
   //WRITE ONLY TEST
   count = 0;
@@ -50,6 +51,8 @@ int main() {
       std::cout << "LOAD FAIL!\n";
       return -1;
     }
+    //if ((count % 1000000) == 0)
+    //std::cout << count << "\n";
     count++;
     value++;
   }
@@ -57,6 +60,7 @@ int main() {
 
   double tput = count / (end_time - start_time) / 1000000; //Mops/sec
   //std::cout << tput << "\n";
+  std::cout << "stxbtree " << "url " << "string memory " << (memory_string + 0.0)/1000000 << "\n";
   std::cout << "stxbtree " << "url " << "memory " << (memory + memory_string + 0.0)/1000000 << "\n";
 
   //load txns

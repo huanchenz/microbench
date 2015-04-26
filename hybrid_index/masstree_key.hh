@@ -140,12 +140,12 @@ class key {
     }
 
   //huanchen-static=================================================================
-  inline int compare_ikey(ikey_type ikey) const {
+  int compare_ikey(ikey_type ikey) const {
     int cmp = ::compare(this->ikey(), ikey);
     return cmp;
   }
 
-  inline int compare_len(int keylenx) const {
+  int compare_len(int keylenx) const {
     int cmp = 0;
     int al = this->length();
     if (al > ikey_size)
@@ -256,6 +256,15 @@ inline int key_compare(const Masstree::key<typename P::ikey_type>& a, Masstree::
 //huanchen-static-multivalue
 template <typename P>
 inline int key_compare(const Masstree::key<typename P::ikey_type>& a, Masstree::massnode_multivalue<P>& b, int bp)
+{
+  int cmp = a.compare_ikey(b.ikey(bp));
+  if (cmp == 0)
+    a.compare_len(b.get_keylenx()[bp]);
+  return cmp;
+}
+//huanchen-static-dynamicvalue
+template <typename P>
+inline int key_compare(const Masstree::key<typename P::ikey_type>& a, Masstree::massnode_dynamicvalue<P>& b, int bp)
 {
   int cmp = a.compare_ikey(b.ikey(bp));
   if (cmp == 0)

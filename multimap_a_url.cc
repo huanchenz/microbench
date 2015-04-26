@@ -1,11 +1,17 @@
 #include "microbench.hh"
 
-int main(int argc, char *argv[]) {
-  std::ifstream infile_load("workloads/loadc_zipf_url_100M.dat");
-  std::ifstream infile_txn("workloads/txnsc_zipf_url_100M.dat");
+int main() {
+  std::ifstream infile_load("workloads/loada_zipf_url_100M.dat");
+  std::ifstream infile_txn("workloads/txnsa_zipf_url_100M.dat");
 
-  HybridType hybrid;
-  hybrid.setup(KEY_LEN_URL, false);
+  //MapType stdmap;
+  //MapType::const_iterator stdmap_keyIter;
+
+  int64_t memory = 0;
+  AllocatorType_str *alloc = new AllocatorType_str(&memory);
+
+  MapType_multi_str_alloc *multimap = new MapType_multi_str_alloc(std::less<std::string>(), (*alloc));
+  std::pair<MapType_multi_str_alloc::const_iterator, MapType_multi_str_alloc::const_iterator> multimap_keyIter;
 
   std::string op;
   std::string key;
@@ -20,8 +26,9 @@ int main(int argc, char *argv[]) {
 
   int count = 0;
   uint64_t value = 0;
+
   //read init file
-  while ((count < INIT_LIMIT) && infile_load.good()) {
+  while ((count < INIT_LIMIT) && infile_txn.good()) {
     infile_load >> op >> key;
     if (op.compare(insert) != 0) {
       std::cout << "READING LOAD FILE FAIL!\n";
@@ -31,38 +38,23 @@ int main(int argc, char *argv[]) {
     count++;
   }
 
-  //std::cout << "start\n";
   //initial load
   //WRITE ONLY TEST
   count = 0;
   double start_time = get_now();
   while (count < (int)init_keys.size()) {
-  //while (count < 10000) {
-    //std::cout << "count = " << count << "\n";
-    uint64_t* value_ptr = &value;
-    if (!hybrid.put_uv((const char*)(init_keys[count].c_str()), init_keys[count].size(), (const char*)value_ptr, 8)) {
-      std::cout << init_keys[count] << "\n";
-      std::cout << count << "===========\n";
-      std::cout << "LOAD FAIL!\n";
-      return -1;
+    for (int i = 0; i < VALUES_PER_KEY; i++) {
+      multimap->insert(std::pair<std::string, uint64_t>(init_keys[count], value));
+      value++;
     }
-    //if ((count % 1000000) == 0)
-    //std::cout << count << "\n";
     count++;
-    value++;
   }
   double end_time = get_now();
 
-  double tput = count / (end_time - start_time) / 1000000; //Mops/sec
-  double memory = (hybrid.memory_consumption() + 0.0) /1000000; //MB
-  if (HYBRID > 0)
-    std::cout << "hybrid ";
-  else if (HYBRID < 0)
-    std::cout << "mt ";
-  else
-    std::cout << "cmt ";
-  std::cout << "url " << "memory " << memory << "\n";
+  double tput = count * VALUES_PER_KEY / (end_time - start_time) / 1000000; //Mops/sec
   //std::cout << tput << "\n";
+  std::cout << "multimap " << "url " << "insert " << tput << "\n";
+  //std::cout << "stdmap " << "int " << "memory " << (memory + 0.0) << "\n";
 
   //load txns
   count = 0;
@@ -83,23 +75,23 @@ int main(int argc, char *argv[]) {
     count++;
   }
 
-  if (HYBRID >= 0)
-    hybrid.merge(); //hack
-
-  //DO TXNS
+  //READ
   start_time = get_now();
   int txn_num = 0;
-  value = 0;
+  uint64_t sum;
   while ((txn_num < LIMIT) && (txn_num < (int)ops.size())) {
-    Str val;
     if (ops[txn_num] == 1) { //READ
-      if (!hybrid.get((const char*)(keys[txn_num].c_str()), keys[txn_num].size(), val)) {
-	//std::cout << txn_num << "\n";
-	std::cout << keys[txn_num] << "\n";
-	std::cout << txn_num << "===========\n";
+      //stdmap_keyIter = stdmap->find(keys[txn_num]);
+      multimap_keyIter = multimap->equal_range(keys[txn_num]);
+      if (multimap_keyIter.first == multimap_keyIter.second) {
 	std::cout << "READ FAIL\n";
-	return -1;
       }
+    }
+    else if (ops[txn_num] == 2) { //UPDATE
+      multimap_keyIter = multimap->equal_range(keys[txn_num]);
+      multimap->erase(multimap_keyIter.first);
+      multimap->insert(std::pair<std::string, uint64_t>(keys[count], value));
+      value++;
     }
     else {
       std::cout << "UNRECOGNIZED CMD!\n";
@@ -110,14 +102,7 @@ int main(int argc, char *argv[]) {
   end_time = get_now();
 
   tput = txn_num / (end_time - start_time) / 1000000; //Mops/sec
-
-  if (HYBRID > 0)
-    std::cout << "hybrid ";
-  else if (HYBRID < 0)
-    std::cout << "mt ";
-  else
-    std::cout << "cmt ";
-  std::cout << "url " << "read " << tput << "\n";
+  std::cout << "multimap " << "url " << "read/update " << tput << "\n";
   //std::cout << "time elapsed = " << (end_time - start_time) << "\n";
 
   return 0;

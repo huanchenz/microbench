@@ -111,7 +111,8 @@ int main() {
   end_time = get_now();
 
   tput = txn_num / (end_time - start_time) / 1000000; //Mops/sec
-  std::cout << "stxbtree " << "int " << "scan " << (tput + (sum - sum)) << "\n";
+  std::cout << sum << "\n";
+  std::cout << "stxbtree " << "int " << "scan " << tput << "\n";
   //std::cout << "time elapsed = " << (end_time - start_time) << "\n";
 
   return 0;

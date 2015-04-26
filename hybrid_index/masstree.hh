@@ -52,12 +52,16 @@ template <typename P> class tcursor;
 //huanchen-static
 template <typename P> class massnode;
 template <typename P> class massnode_multivalue;
+template <typename P> class massnode_dynamicvalue;
 template <typename P> class stcursor;
 template <typename P> class stcursor_multivalue;
+template <typename P> class stcursor_dynamicvalue;
 template <typename P> class stcursor_scan;
 template <typename P> class stcursor_scan_multivalue;
+template <typename P> class stcursor_scan_dynamicvalue;
 template <typename P> class stcursor_merge;
 template <typename P> class stcursor_merge_multivalue;
+template <typename P> class stcursor_merge_dynamicvalue;
 template <typename P> class leafvalue_static;
 template <typename P> class leafvalue_static_multivalue;
 
@@ -76,15 +80,19 @@ class basic_table {
   //huanchen-static
   typedef stcursor<P> static_cursor_type;
   typedef stcursor_multivalue<P> static_multivalue_cursor_type;
+  typedef stcursor_dynamicvalue<P> static_dynamicvalue_cursor_type;
   typedef stcursor_scan<P> static_cursor_scan_type;
   typedef stcursor_scan_multivalue<P> static_multivalue_cursor_scan_type;
+  typedef stcursor_scan_dynamicvalue<P> static_dynamicvalue_cursor_scan_type;
   typedef stcursor_merge<P> static_cursor_merge_type;
   typedef stcursor_merge_multivalue<P> static_cursor_merge_multivalue_type;
+  typedef stcursor_merge_dynamicvalue<P> static_cursor_merge_dynamicvalue_type;
 
     inline basic_table();
 
     void initialize(threadinfo& ti);
     void destroy(threadinfo& ti);
+    void destroy_novalue(threadinfo& ti); //huanchen
 
     inline node_type* root() const;
     inline node_type* fix_root();

@@ -283,6 +283,7 @@ struct destroy_rcu_callback : public P::threadinfo_type::rcu_callback {
         : root_(root), count_(0) {
     }
     void operator()(threadinfo& ti);
+    void operator[](threadinfo& ti); //huanchen
     static void make(node_base<P>* root, Str prefix, threadinfo& ti);
   private:
     static inline node_base<P>** link_ptr(node_base<P>* n);
@@ -356,6 +357,60 @@ void destroy_rcu_callback<P>::operator()(threadinfo& ti) {
     //std::cout << "destroying--END\n";
 }
 
+  //huanchen
+template <typename P>
+void destroy_rcu_callback<P>::operator[](threadinfo& ti) {
+  //std::cout << "destroying--START\n";
+    if (++count_ == 1) {
+      //std::cout << "destroying--if(++count_==1) TRUE\n";
+        root_ = root_->unsplit_ancestor();
+        root_->lock();
+        root_->mark_deleted_tree(); // i.e., deleted but not splitting
+        root_->unlock();
+        ti.rcu_register(this);
+        return;
+    }
+
+    //std::cout << "destroying--if(++count_==1) FALSE\n";
+    node_base<P>* workq;
+    node_base<P>** tailp = &workq;
+    enqueue(root_, tailp);
+
+    while (node_base<P>* n = workq) {
+        node_base<P>** linkp = link_ptr(n);
+        if (linkp != tailp)
+            workq = *linkp;
+        else {
+            workq = 0;
+            tailp = &workq;
+        }
+
+        if (n->isleaf()) {
+            leaf_type* l = static_cast<leaf_type*>(n);
+            typename leaf_type::permuter_type perm = l->permutation();
+            for (int i = 0; i != l->size(); ++i) {
+                int p = perm[i];
+                if (l->is_layer(p))
+                    enqueue(l->lv_[p].layer(), tailp);
+		//else
+		//(l->lv_[p].value())->deallocate_rcu(ti);
+            }
+	    //std::cout << "destroying--LEAF\n";
+            l->deallocate(ti);
+        } else {
+            internode_type* in = static_cast<internode_type*>(n);
+            for (int i = 0; i != in->size() + 1; ++i)
+                if (in->child_[i])
+                    enqueue(in->child_[i], tailp);
+	    //std::cout << "destroying--INTERNODE\n";
+            in->deallocate(ti);
+        }
+    }
+    ti.deallocate(this, sizeof(this), memtag_masstree_gc);
+    //std::cout << "destroying--END\n";
+}
+
+
 template <typename P>
 void basic_table<P>::destroy(threadinfo& ti) {
     if (root_) {
@@ -378,6 +433,16 @@ void basic_table<P>::destroy(threadinfo& ti) {
         root_ = 0;
 	ti.deallocate(data, sizeof(destroy_rcu_callback<P>), memtag_masstree_gc);
 	*/
+    }
+}
+
+template <typename P>
+void basic_table<P>::destroy_novalue(threadinfo& ti) {
+    if (root_) {
+        void* data = ti.allocate(sizeof(destroy_rcu_callback<P>), memtag_masstree_gc);
+        destroy_rcu_callback<P>* cb = new(data) destroy_rcu_callback<P>(root_);
+	++(cb->count_);
+	(*cb)[ti];
     }
 }
 

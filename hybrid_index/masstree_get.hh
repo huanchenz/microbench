@@ -230,6 +230,9 @@ bool tcursor<P>::find_locked(threadinfo& ti)
 }
 
 //huanchen-static
+//**********************************************************************************
+// buildStatic
+//**********************************************************************************
 template <typename P>
 massnode<P> *unlocked_tcursor<P>::buildStatic(threadinfo &ti) {
   typedef typename P::ikey_type ikey_type;
@@ -287,7 +290,7 @@ massnode<P> *unlocked_tcursor<P>::buildStatic(threadinfo &ti) {
     goto nextLeafNode;
   }
 
-  massnode<P> *newNode = massnode<P>::make(ksufSize, nkeys, ti);
+  massnode<P> *newNode = massnode<P>::make(ksufSize, true, nkeys, ti);
   massnode_list.push_back(newNode);
   char *ksuf_curpos = newNode->get_ksuf();
   char *ksuf_startpos = newNode->get_ksuf();
@@ -301,8 +304,10 @@ massnode<P> *unlocked_tcursor<P>::buildStatic(threadinfo &ti) {
       newNode->get_lv()[i].set_value((uintptr_t)massID);
       massID++;
     }
-    else 
+    else {
       newNode->set_lv(i, leafvalue_static<P>(lv_list[i].value()->col(0).s));
+      lv_list[i].value()->deallocate_rcu(ti);
+    }
 
     newNode->set_ksuf_offset(i, (uint32_t)(ksuf_curpos - ksuf_startpos));
 
@@ -344,7 +349,74 @@ massnode<P> *unlocked_tcursor<P>::buildStatic(threadinfo &ti) {
   return massnode_list[0];
 }
 
+template <typename P>
+massnode<P> *unlocked_tcursor<P>::buildStatic_quick(int nkeys, threadinfo &ti) {
+  std::deque<leafvalue<P>> trienode_list;
+  std::vector<massnode<P>*> massnode_list;
+
+  int kp = 0;
+  unsigned int massID = 1;
+  node_base<P> *root = const_cast <node_base<P>*> (root_);
+  leaf<P> *next;
+  int cur_pos;
+
+ nextTrieNode:
+  massnode<P> *newNode = massnode<P>::make(0, false, nkeys, ti);
+  massnode_list.push_back(newNode);
+  cur_pos = 0;
+  n_ = root -> leftmost();
+ nextLeafNode:
+  // extract info from a B-tree
+  perm_ = n_ -> permutation();
+  for (int i = 0; i < perm_.size(); i++) {
+    kp = perm_[i];
+    newNode->set_ikeylen(cur_pos, n_->keylenx_[kp]);
+    newNode->set_ikey(cur_pos, n_->ikey0_[kp]);
+
+    if (leaf<P>::keylenx_is_layer(newNode->ikeylen(cur_pos))) {
+      newNode->get_lv()[cur_pos].set_value((uintptr_t)massID);
+      massID++;
+    }
+    else {
+      newNode->set_lv(cur_pos, leafvalue_static<P>(n_->lv_[kp].value()->col(0).s));
+      n_->lv_[kp].value()->deallocate_rcu(ti);
+    }
+
+    //newNode->set_ksuf_offset(cur_pos, 0);
+
+    if (n_->keylenx_is_layer(n_->keylenx_[kp])) {
+      trienode_list.push_back(n_->lv_[kp]); // trienode BFS queue
+    }
+    cur_pos++;
+  }
+
+  next = n_->safe_next();
+  if (next) {
+    n_ = next;
+    goto nextLeafNode;
+  }
+
+  //newNode->set_ksuf_offset(cur_pos, 0);
+
+  // next trienode
+  if (!trienode_list.empty()) {
+    root = trienode_list.front().layer();
+    trienode_list.pop_front();
+    goto nextTrieNode;
+  }
+
+  for (unsigned int i = 0; i < massnode_list.size(); i++)
+    for (unsigned int j = 0; j < massnode_list[i]->nkeys_; j++)
+      if (leaf<P>::keylenx_is_layer(massnode_list[i]->ikeylen(j)))
+	massnode_list[i]->set_lv(j, leafvalue_static<P>(massnode_list[massnode_list[i]->get_lv()[j].get_value()])); // link the massnode into a trie
+
+  return massnode_list[0];
+}
+
 //huanchen-static-multivalue
+//**********************************************************************************
+// buildStaticMultivalue
+//**********************************************************************************
 template <typename P>
 massnode_multivalue<P> *unlocked_tcursor<P>::buildStaticMultivalue(threadinfo &ti) {
   typedef typename P::ikey_type ikey_type;
@@ -468,7 +540,131 @@ massnode_multivalue<P> *unlocked_tcursor<P>::buildStaticMultivalue(threadinfo &t
   return massnode_list[0];
 }
 
-  //huanchen-static
+
+
+//huanchen-static-multivalue
+//**********************************************************************************
+// buildStaticDynamicvalue
+//**********************************************************************************
+template <typename P>
+massnode_dynamicvalue<P> *unlocked_tcursor<P>::buildStaticDynamicvalue(threadinfo &ti) {
+  typedef typename P::ikey_type ikey_type;
+
+  std::vector<uint8_t> ikeylen_list;
+  std::vector<ikey_type> ikey_list;
+  std::deque<leafvalue<P>> trienode_list;
+  std::vector<leafvalue<P>> lv_list;
+  std::vector<massnode_dynamicvalue<P>*> massnode_list;
+
+  //suffix=====================================
+  std::vector<bool> has_ksuf_list;
+  std::vector<Str> ksuf_list;
+  size_t ksufSize = 0;
+  //===========================================
+
+  int kp = 0;
+  unsigned int massID = 1;
+  int nkeys = 0;
+  node_base<P> *root = const_cast <node_base<P>*> (root_);
+  leaf<P> *next;
+
+
+ nextTrieNode:
+  n_ = root -> leftmost();
+ nextLeafNode:
+  // extract info from a B-tree
+  perm_ = n_ -> permutation();
+  nkeys += perm_.size();
+  for (int i = 0; i < perm_.size(); i++) {
+    kp = perm_[i];
+    ikeylen_list.push_back(n_->keylenx_[kp]); // ikeylen array
+    ikey_list.push_back(n_->ikey0_[kp]); // ikey array
+    lv_list.push_back(n_->lv_[kp]); // lv array
+
+    if (n_->keylenx_is_layer(n_->keylenx_[kp]))
+      trienode_list.push_back(n_->lv_[kp]); // trienode BFS queue
+
+    //suffix=========================================================
+    if (n_->has_ksuf(kp)) {      
+      ksufSize += n_->ksuf(kp).len;
+      has_ksuf_list.push_back(true);
+      ksuf_list.push_back(n_->ksuf(kp)); // key_suffix array
+    }
+    else {
+      has_ksuf_list.push_back(false);
+      ksuf_list.push_back(Str()); // key_suffix array
+    }
+    //===============================================================
+  }
+
+  next = n_->safe_next();
+  if (next) {
+    n_ = next;
+    goto nextLeafNode;
+  }
+
+  massnode_dynamicvalue<P> *newNode = massnode_dynamicvalue<P>::make(ksufSize, nkeys, ti);
+  massnode_list.push_back(newNode);
+  char *ksuf_curpos = newNode->get_ksuf();
+  char *ksuf_startpos = newNode->get_ksuf();
+
+  // turning a B-tree into a massnode_multivalue
+  for (int i = 0; i < nkeys; i++) {
+    newNode->set_ikeylen(i, ikeylen_list[i]);
+    newNode->set_ikey(i, ikey_list[i]);
+
+    if (leaf<P>::keylenx_is_layer(newNode->ikeylen(i))) {
+      newNode->get_lv()[i].set_value((uintptr_t)massID);
+      massID++;
+    }
+    else {
+      newNode->set_lv(i, lv_list[i]);
+    }
+
+    newNode->set_ksuf_offset(i, (uint32_t)(ksuf_curpos - ksuf_startpos));
+    //suffix==================================================================
+    if (has_ksuf_list[i]) {
+      memcpy(ksuf_curpos, ksuf_list[i].s, ksuf_list[i].len);
+      ksuf_curpos += ksuf_list[i].len;
+    }
+    //========================================================================
+  }
+  newNode->set_ksuf_offset(nkeys, (uint32_t)(ksuf_curpos - ksuf_startpos));
+
+  // reset holders
+  ikeylen_list.clear();
+  ikey_list.clear();
+  lv_list.clear();
+
+  //suffix============================
+  has_ksuf_list.clear();
+  ksuf_list.clear();
+  ksufSize = 0;
+  //==================================
+
+  nkeys = 0;
+
+  // next trienode
+  if (!trienode_list.empty()) {
+    root = trienode_list.front().layer();
+    trienode_list.pop_front();
+    goto nextTrieNode;
+  }
+
+  for (unsigned int i = 0; i < massnode_list.size(); i++)
+    for (unsigned int j = 0; j < massnode_list[i]->nkeys_; j++)
+      if (leaf<P>::keylenx_is_layer(massnode_list[i]->ikeylen(j)))
+	massnode_list[i]->set_lv(j, leafvalue<P>(massnode_list[massnode_list[i]->get_lv()[j].get_value()])); // link the massnode into a trie
+
+  return massnode_list[0];
+}
+
+
+
+//huanchen-static
+//**********************************************************************************
+// stcursor::find
+//**********************************************************************************
 template <typename P>
 bool stcursor<P>::find() {
   if (!root_)
@@ -496,7 +692,10 @@ bool stcursor<P>::find() {
   }
 }
 
-  //huanchen-static-multivalue
+//huanchen-static-multivalue
+//**********************************************************************************
+// stcursor_multivalue::find
+//**********************************************************************************
 template <typename P>
 bool stcursor_multivalue<P>::find() {
   if (!root_)
@@ -524,7 +723,43 @@ bool stcursor_multivalue<P>::find() {
   }
 }
 
-  //huanchen-static
+
+//huanchen-static-dynamicvalue
+//**********************************************************************************
+// stcursor_dynamicvalue::find
+//**********************************************************************************
+template <typename P>
+bool stcursor_dynamicvalue<P>::find() {
+  if (!root_)
+    return false;
+  bool ksuf_match = false; //suffix
+  int kp, keylenx = 0;
+  n_ = static_cast<massnode_dynamicvalue<P>*>(root_);
+
+ nextNode:
+  kp = lower_bound_binary();
+  if (kp < 0)
+    return false;
+  keylenx = n_->ikeylen(kp);
+  lv_ = &(n_->get_lv()[kp]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    ka_.shift();
+    n_ = static_cast<massnode_dynamicvalue<P>*>(lv_->layer());
+    goto nextNode;
+  }
+  else {
+    if (!n_->isValid(kp))
+      return false;
+    ksuf_match = n_->ksuf_equals(kp, ka_, keylenx); //suffix
+    return ksuf_match; //suffix
+  }
+}
+
+
+//huanchen-static
+//**********************************************************************************
+// stcursor::remove
+//**********************************************************************************
 template <typename P>
 bool stcursor<P>::remove() {
   if (!root_)
@@ -556,6 +791,10 @@ bool stcursor<P>::remove() {
   }
 }
 
+
+//**********************************************************************************
+// stcursor::update
+//**********************************************************************************
 template <typename P>
 bool stcursor<P>::update(const char *nv) {
   if (!root_)
@@ -587,7 +826,11 @@ bool stcursor<P>::update(const char *nv) {
   }
 }
 
-  //huanchen-static-multivalue
+
+//huanchen-static-multivalue
+//**********************************************************************************
+// stcursor_multivalue::remove
+//**********************************************************************************
 template <typename P>
 bool stcursor_multivalue<P>::remove() {
   if (!root_)
@@ -618,7 +861,47 @@ bool stcursor_multivalue<P>::remove() {
   }
 }
 
-  //huanchen-static
+
+//huanchen-static-multivalue
+//**********************************************************************************
+// stcursor_multivalue::remove
+//**********************************************************************************
+template <typename P>
+bool stcursor_dynamicvalue<P>::remove(threadinfo &ti) {
+  if (!root_)
+    return false;
+  bool ksuf_match = false; //suffix
+  int kp, keylenx = 0;
+  n_ = static_cast<massnode_dynamicvalue<P>*>(root_);
+
+ nextNode:
+  kp = lower_bound_binary();
+  if (kp < 0)
+    return false;
+  keylenx = n_->ikeylen(kp);
+  lv_ = &(n_->get_lv()[kp]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    ka_.shift();
+    n_ = static_cast<massnode_dynamicvalue<P>*>(lv_->layer());
+    goto nextNode;
+  }
+  else {
+    if (!n_->isValid(kp))
+      return false;
+    ksuf_match = n_->ksuf_equals(kp, ka_, keylenx); //suffix
+    if (!ksuf_match) //suffix
+      return false;
+    n_->invalidate(kp);
+    lv_->value()->deallocate_rcu(ti);
+    return true;
+  }
+}
+
+
+//huanchen-static
+//**********************************************************************************
+// stcursor::destroy
+//**********************************************************************************
 template <typename P>
 void stcursor<P>::destroy(threadinfo &ti) {
   std::vector<massnode<P>*> massnode_list;
@@ -643,7 +926,10 @@ void stcursor<P>::destroy(threadinfo &ti) {
 }
 
 
-  //huanchen-static-multivalue
+//huanchen-static-multivalue
+//**********************************************************************************
+// stcursor_multivalue::destroy
+//**********************************************************************************
 template <typename P>
 void stcursor_multivalue<P>::destroy(threadinfo &ti) {
   std::vector<massnode_multivalue<P>*> massnode_list;
@@ -667,7 +953,39 @@ void stcursor_multivalue<P>::destroy(threadinfo &ti) {
     massnode_list[i]->deallocate(ti);
 }
 
-  //huanchen-static
+
+//huanchen-static-dynamicvalue
+//**********************************************************************************
+// stcursor_dynamicvalue::destroy
+//**********************************************************************************
+template <typename P>
+void stcursor_dynamicvalue<P>::destroy(threadinfo &ti) {
+  std::vector<massnode_dynamicvalue<P>*> massnode_list;
+  unsigned int bfs_cursor = 0;
+  int keylenx = 0;
+  //traverse the tree, get all the massnodes
+  if (root_)
+    massnode_list.push_back(static_cast<massnode_dynamicvalue<P>*>(root_));
+  while (bfs_cursor < massnode_list.size()) {
+    n_ = massnode_list[bfs_cursor];
+    for (unsigned int i = 0; i < n_->size(); i++) {
+      keylenx = n_->ikeylen(i);
+      lv_ = &(n_->get_lv()[i]);
+      if (n_->keylenx_is_layer(keylenx))
+	massnode_list.push_back(static_cast<massnode_dynamicvalue<P>*>(lv_->layer()));
+    }
+    bfs_cursor++;
+  }
+  //free
+  for (unsigned int i = 0; i < massnode_list.size(); i++)
+    massnode_list[i]->deallocate(ti);
+}
+
+
+//huanchen-static
+//**********************************************************************************
+// stcursor::lower_bound_binary
+//**********************************************************************************
 template <typename P>
 inline int stcursor<P>::lower_bound_binary() const {
   int l = 0;
@@ -688,7 +1006,11 @@ inline int stcursor<P>::lower_bound_binary() const {
   return -1;
 }
 
-  //huanchen-static-multivalue
+
+//huanchen-static-multivalue
+//**********************************************************************************
+// stcursor_multivalue::lower_bound_binary
+//**********************************************************************************
 template <typename P>
 inline int stcursor_multivalue<P>::lower_bound_binary() const {
   int l = 0;
@@ -709,7 +1031,36 @@ inline int stcursor_multivalue<P>::lower_bound_binary() const {
   return -1;
 }
 
-  //huanchen-static-scan
+
+//huanchen-static-dynamicvalue
+//**********************************************************************************
+// stcursor_dynamicvalue::lower_bound_binary
+//**********************************************************************************
+template <typename P>
+inline int stcursor_dynamicvalue<P>::lower_bound_binary() const {
+  int l = 0;
+  int r = n_->nkeys_;
+  while (l < r) {
+    int m = (l + r) >> 1;
+
+    n_ -> prefetch((l + m)/2);
+    n_ -> prefetch((m + r)/2);
+    int cmp = key_compare(ka_, *n_, m);
+    if (cmp < 0)
+      r = m;
+    else if (cmp == 0)
+      return m;
+    else
+      l = m + 1;
+  }
+  return -1;
+}
+
+
+//huanchen-static-scan
+//**********************************************************************************
+// stcursor_scan::find_upper_bound_or_equal
+//**********************************************************************************
 template <typename P>
 bool stcursor_scan<P>::find_upper_bound_or_equal() {
   if (!root_)
@@ -749,7 +1100,11 @@ bool stcursor_scan<P>::find_upper_bound_or_equal() {
   return true;
 }
 
+
 //huanchen-static-scan-multivalue
+//**********************************************************************************
+// stcursor_scan_multivalue::find_upper_bound_or_equal
+//**********************************************************************************
 template <typename P>
 bool stcursor_scan_multivalue<P>::find_upper_bound_or_equal() {
   if (!root_)
@@ -789,7 +1144,55 @@ bool stcursor_scan_multivalue<P>::find_upper_bound_or_equal() {
   return true;
 }
 
+
+//huanchen-static-scan-dynamicvalue
+//**********************************************************************************
+// stcursor_scan_dynamicvalue::find_upper_bound_or_equal
+//**********************************************************************************
+template <typename P>
+bool stcursor_scan_dynamicvalue<P>::find_upper_bound_or_equal() {
+  if (!root_)
+    return false;
+  int kp, keylenx = 0;
+  n_ = static_cast<massnode_dynamicvalue<P>*>(root_);
+ nextNode:
+  kp = upper_bound_or_equal_binary();
+  //out of bound, go back to parent
+  if (kp >= n_->nkeys_)
+    return next_item_from_next_node(kp);
+
+  //find the next valid kp
+  while (!n_->isValid(kp)) {
+    kp++;
+    if (kp >= n_->nkeys_)
+      return next_item_from_next_node(kp);
+  }
+
+  cur_key_prefix_.push_back(n_->ikey(kp));
+  nodeTrace_.push_back(n_);
+  posTrace_.push_back(kp);
+  keylenx = n_->ikeylen(kp);
+  cur_lv_ = &(n_->get_lv()[kp]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    ka_.shift();
+    n_ = static_cast<massnode_dynamicvalue<P>*>(cur_lv_->layer());
+    if (!isExact_)
+      return find_leftmost();
+    goto nextNode;
+  }
+  if (isExact_)
+    if (memcmp(ka_.suffix().s, n_->ksuf(kp).s, ka_.suffix_length()) > 0)
+      return next_item(kp);
+
+  cur_key_suffix_ = n_->ksuf(kp);
+  return true;
+}
+
+
 //huanchen-static-scan
+//**********************************************************************************
+// stcursor_scan::find_upper_bound
+//**********************************************************************************
 template <typename P>
 bool stcursor_scan<P>::find_upper_bound() {
   if (!root_)
@@ -830,7 +1233,11 @@ bool stcursor_scan<P>::find_upper_bound() {
   return next_item(kp);
 }
 
+
 //huanchen-static-scan-multivalue
+//**********************************************************************************
+// stcursor_scan_multivalue::find_upper_bound
+//**********************************************************************************
 template <typename P>
 bool stcursor_scan_multivalue<P>::find_upper_bound() {
   if (!root_)
@@ -871,7 +1278,56 @@ bool stcursor_scan_multivalue<P>::find_upper_bound() {
   return next_item(kp);
 }
 
+
+//huanchen-static-scan-dynamicvalue
+//**********************************************************************************
+// stcursor_scan_dynamicvalue::find_upper_bound
+//**********************************************************************************
+template <typename P>
+bool stcursor_scan_dynamicvalue<P>::find_upper_bound() {
+  if (!root_)
+    return false;
+  int kp, keylenx = 0;
+  n_ = static_cast<massnode_dynamicvalue<P>*>(root_);
+ nextNode:
+  kp = upper_bound_or_equal_binary();
+  //out of bound, go back to parent
+  if (kp >= n_->nkeys_)
+    return next_item_from_next_node(kp);
+
+  //find the next valid kp
+  while (!n_->isValid(kp)) {
+    kp++;
+    if (kp >= n_->nkeys_)
+      return next_item_from_next_node(kp);
+  }
+
+  cur_key_prefix_.push_back(n_->ikey(kp));
+  nodeTrace_.push_back(n_);
+  posTrace_.push_back(kp);
+  keylenx = n_->ikeylen(kp);
+  cur_lv_ = &(n_->get_lv()[kp]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    ka_.shift();
+    n_ = static_cast<massnode_dynamicvalue<P>*>(cur_lv_->layer());
+    if (!isExact_)
+      return find_leftmost();
+    goto nextNode;
+  }
+
+  if (!isExact_) {
+    cur_key_suffix_ = n_->ksuf(kp);
+    return true;
+  }
+
+  return next_item(kp);
+}
+
+
 //huanchen-static-scan
+//**********************************************************************************
+// stcursor_scan::find_leftmost
+//**********************************************************************************
 template <typename P>
 bool stcursor_scan<P>::find_leftmost() {
   if (!n_)
@@ -890,6 +1346,9 @@ bool stcursor_scan<P>::find_leftmost() {
 }
 
 //huanchen-static-multivalue
+//**********************************************************************************
+// stcursor_scan_multivalue::find_leftmost
+//**********************************************************************************
 template <typename P>
 bool stcursor_scan_multivalue<P>::find_leftmost() {
   if (!n_)
@@ -907,7 +1366,33 @@ bool stcursor_scan_multivalue<P>::find_leftmost() {
   return true;
 }
 
+//huanchen-static-dynamicvalue
+//**********************************************************************************
+// stcursor_scan_dynamicvalue::find_leftmost
+//**********************************************************************************
+template <typename P>
+bool stcursor_scan_dynamicvalue<P>::find_leftmost() {
+  if (!n_)
+    return false;
+  int keylenx = 0;
+ nextNode:
+  cur_key_prefix_.push_back(n_->ikey(0));
+  keylenx = n_->ikeylen(0);
+  cur_lv_ = &(n_->get_lv()[0]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    n_ = static_cast<massnode_dynamicvalue<P>*>(cur_lv_->layer());
+    goto nextNode;
+  }
+  cur_key_suffix_ = n_->ksuf(0);
+  return true;
+}
+
+
+
 //huanchen-static-scan
+//**********************************************************************************
+// stcursor_scan::next_item
+//**********************************************************************************
 template <typename P>
 inline bool stcursor_scan<P>::next_item(int kp) {
   int keylenx = 0;
@@ -939,6 +1424,9 @@ inline bool stcursor_scan<P>::next_item(int kp) {
 }
 
 //huanchen-static-scan-multivalue
+//**********************************************************************************
+// stcursor_scan_multivalue::next_item
+//**********************************************************************************
 template <typename P>
 inline bool stcursor_scan_multivalue<P>::next_item(int kp) {
   int keylenx = 0;
@@ -969,7 +1457,46 @@ inline bool stcursor_scan_multivalue<P>::next_item(int kp) {
   return true;
 }
 
+//huanchen-static-scan-dynamicvalue
+//**********************************************************************************
+// stcursor_scan_dynamicvalue::next_item
+//**********************************************************************************
+template <typename P>
+inline bool stcursor_scan_dynamicvalue<P>::next_item(int kp) {
+  int keylenx = 0;
+  kp++;
+  //out of bound, go back to parent
+  if (kp >= n_->nkeys_)
+    return next_item_from_next_node(kp);
+      
+  //find the next valid kp
+  while (!n_->isValid(kp)) {
+    kp++;
+    if (kp >= n_->nkeys_)
+      return next_item_from_next_node(kp);
+  }
+  cur_key_prefix_.pop_back();
+  posTrace_[posTrace_.size() - 1]++;
+  cur_key_prefix_.push_back(n_->ikey(kp));
+
+  keylenx = n_->ikeylen(kp);
+  cur_lv_ = &(n_->get_lv()[kp]);
+      
+  if (n_->keylenx_is_layer(keylenx)) {
+    n_ = static_cast<massnode_dynamicvalue<P>*>(next_lv_->layer());
+    return find_leftmost();
+  }
+
+  cur_key_suffix_ = n_->ksuf(kp);
+  return true;
+}
+
+
+
 //huanchen-static-scan
+//**********************************************************************************
+// stcursor_scan::next_item_from_next_node
+//**********************************************************************************
 template <typename P>
 inline bool stcursor_scan<P>::next_item_from_next_node(int kp) {
   int keylenx = 0;
@@ -1021,6 +1548,9 @@ inline bool stcursor_scan<P>::next_item_from_next_node(int kp) {
 }
 
 //huanchen-static-scan-multivalue
+//**********************************************************************************
+// stcursor_scan_multivalue::next_item_from_next_node
+//**********************************************************************************
 template <typename P>
 inline bool stcursor_scan_multivalue<P>::next_item_from_next_node(int kp) {
   int keylenx = 0;
@@ -1071,7 +1601,68 @@ inline bool stcursor_scan_multivalue<P>::next_item_from_next_node(int kp) {
   return true;
 }
 
+
+//huanchen-static-scan-dynamicvalue
+//**********************************************************************************
+// stcursor_scan_dynamicvalue::next_item_from_next_node
+//**********************************************************************************
+template <typename P>
+inline bool stcursor_scan_dynamicvalue<P>::next_item_from_next_node(int kp) {
+  int keylenx = 0;
+  int stack_size = nodeTrace_.size();
+  if (stack_size == 0)
+    return false;
+  n_ = nodeTrace_[stack_size - 1];
+  kp = posTrace_[stack_size - 1] + 1;
+  nodeTrace_.pop_back();
+  posTrace_.pop_back();
+  cur_key_prefix_.pop_back();
+  while (kp >= n_->nkeys_) {
+    stack_size = nodeTrace_.size();
+    if (stack_size == 0)
+      return false;
+    n_ = nodeTrace_[stack_size - 1];
+    kp = posTrace_[stack_size - 1] + 1;
+    nodeTrace_.pop_back();
+    posTrace_.pop_back();
+    cur_key_prefix_.pop_back();
+  }
+
+  //find the next valid kp
+  while (!n_->isValid(kp)) {
+    kp++;
+    while (kp >= n_->nkeys_) {
+      stack_size = nodeTrace_.size();
+      if (stack_size == 0)
+	return false;
+      n_ = nodeTrace_[stack_size - 1];
+      kp = posTrace_[stack_size - 1] + 1;
+      nodeTrace_.pop_back();
+      posTrace_.pop_back();
+      cur_key_prefix_.pop_back();
+    }
+  }
+
+  cur_key_prefix_.push_back(n_->ikey(kp));
+  nodeTrace_.push_back(n_);
+  posTrace_.push_back(kp);
+  keylenx = n_->ikeylen(kp);
+  cur_lv_ = &(n_->get_lv()[kp]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    n_ = static_cast<massnode_dynamicvalue<P>*>(cur_lv_->layer());
+    return find_leftmost();
+  }
+  cur_key_suffix_ = n_->ksuf(kp);
+  return true;
+}
+
+
+
+
 //huanchen-static-scan
+//**********************************************************************************
+// stcursor_scan::find_next
+//**********************************************************************************
 template <typename P>
 bool stcursor_scan<P>::find_next() {
   if (!root_)
@@ -1102,7 +1693,45 @@ bool stcursor_scan<P>::find_next() {
   return next_item_next(kp);
 }
 
+template <typename P>
+bool stcursor_scan<P>::find_next1() {
+  if (!root_)
+    return false;
+  int keylenx = 0;
+  n_ = static_cast<massnode<P>*>(root_);
+ nextNode:
+  kp_ = lower_bound_binary();
+  if (kp_ < 0)
+    return false;
+
+  cur_key_prefix_.push_back(n_->ikey(kp_));
+  next_key_prefix_.push_back(n_->ikey(kp_));
+  nodeTrace_.push_back(n_);
+  posTrace_.push_back(kp_);
+  
+  keylenx = n_->ikeylen(kp_);
+  cur_lv_ = &(n_->get_lv()[kp_]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    ka_.shift();
+    n_ = static_cast<massnode<P>*>(cur_lv_->layer());
+    goto nextNode;
+  }
+  if (!n_->isValid(kp_))
+    return false;
+  cur_key_suffix_ = n_->ksuf(kp_);
+
+  return next_item_next();
+}
+
+template <typename P>
+bool stcursor_scan<P>::find_next2() {
+  return next_item_next();
+}
+
 //huanchen-static-scan-multivalue
+//**********************************************************************************
+// stcursor_scan_multivalue::find_next
+//**********************************************************************************
 template <typename P>
 bool stcursor_scan_multivalue<P>::find_next() {
   if (!root_)
@@ -1133,7 +1762,83 @@ bool stcursor_scan_multivalue<P>::find_next() {
   return next_item_next(kp);
 }
 
+
+//huanchen-static-scan-dynamicvalue
+//**********************************************************************************
+// stcursor_scan_dynamicvalue::find_next
+//**********************************************************************************
+template <typename P>
+bool stcursor_scan_dynamicvalue<P>::find_next() {
+  if (!root_)
+    return false;
+  int kp, keylenx = 0;
+  n_ = static_cast<massnode_dynamicvalue<P>*>(root_);
+ nextNode:
+  kp = lower_bound_binary();
+  if (kp < 0)
+    return false;
+
+  cur_key_prefix_.push_back(n_->ikey(kp));
+  next_key_prefix_.push_back(n_->ikey(kp));
+  nodeTrace_.push_back(n_);
+  posTrace_.push_back(kp);
+  
+  keylenx = n_->ikeylen(kp);
+  cur_lv_ = &(n_->get_lv()[kp]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    ka_.shift();
+    n_ = static_cast<massnode_dynamicvalue<P>*>(cur_lv_->layer());
+    goto nextNode;
+  }
+  if (!n_->isValid(kp))
+    return false;
+  cur_key_suffix_ = n_->ksuf(kp);
+
+  return next_item_next(kp);
+}
+
+template <typename P>
+bool stcursor_scan_dynamicvalue<P>::find_next1() {
+  if (!root_)
+    return false;
+  int keylenx = 0;
+  n_ = static_cast<massnode_dynamicvalue<P>*>(root_);
+ nextNode:
+  kp_ = lower_bound_binary();
+  if (kp_ < 0)
+    return false;
+
+  cur_key_prefix_.push_back(n_->ikey(kp_));
+  next_key_prefix_.push_back(n_->ikey(kp_));
+  nodeTrace_.push_back(n_);
+  posTrace_.push_back(kp_);
+  
+  keylenx = n_->ikeylen(kp_);
+  cur_lv_ = &(n_->get_lv()[kp_]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    ka_.shift();
+    n_ = static_cast<massnode_dynamicvalue<P>*>(cur_lv_->layer());
+    goto nextNode;
+  }
+  if (!n_->isValid(kp_))
+    return false;
+  cur_key_suffix_ = n_->ksuf(kp_);
+
+  return next_item_next();
+}
+
+template <typename P>
+bool stcursor_scan_dynamicvalue<P>::find_next2() {
+  return next_item_next();
+}
+
+
+
+
 //huanchen-static-scan
+//**********************************************************************************
+// stcursor_scan::find_next_leftmost
+//**********************************************************************************
 template <typename P>
 bool stcursor_scan<P>::find_next_leftmost() {
   if (!n_)
@@ -1152,6 +1857,9 @@ bool stcursor_scan<P>::find_next_leftmost() {
 }
 
 //huanchen-static-scan-multivalue
+//**********************************************************************************
+// stcursor_scan_multivalue::find_next_leftmost
+//**********************************************************************************
 template <typename P>
 bool stcursor_scan_multivalue<P>::find_next_leftmost() {
   if (!n_)
@@ -1169,7 +1877,33 @@ bool stcursor_scan_multivalue<P>::find_next_leftmost() {
   return true;
 }
 
+//huanchen-static-scan-dynamicvalue
+//**********************************************************************************
+// stcursor_scan_dynamicvalue::find_next_leftmost
+//**********************************************************************************
+template <typename P>
+bool stcursor_scan_dynamicvalue<P>::find_next_leftmost() {
+  if (!n_)
+    return false;
+  int keylenx = 0;
+ nextNode:
+  next_key_prefix_.push_back(n_->ikey(0));
+  keylenx = n_->ikeylen(0);
+  next_lv_ = &(n_->get_lv()[0]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    n_ = static_cast<massnode_dynamicvalue<P>*>(next_lv_->layer());
+    goto nextNode;
+  }
+  next_key_suffix_ = n_->ksuf(0);
+  return true;
+}
+
+
+
 //huanchen-static-scan
+//**********************************************************************************
+// stcursor_scan::next_item_next
+//**********************************************************************************
 template <typename P>
 inline bool stcursor_scan<P>::next_item_next(int kp) {
   int keylenx = 0;
@@ -1198,7 +1932,40 @@ inline bool stcursor_scan<P>::next_item_next(int kp) {
   return true;
 }
 
+
+template <typename P>
+inline bool stcursor_scan<P>::next_item_next() {
+  int keylenx = 0;
+  kp_++;
+  next_key_prefix_.pop_back();
+  //out of bound, go back to parent
+  if (kp_ >= n_->nkeys_)
+    return next_item_from_next_node_next();
+
+  //find the next valid kp
+  while (!n_->isValid(kp_)) {
+    kp_++;
+    if (kp_ >= n_->nkeys_)
+      return next_item_from_next_node_next();
+  }
+
+  posTrace_[posTrace_.size() - 1]++;
+  next_key_prefix_.push_back(n_->ikey(kp_));
+  keylenx = n_->ikeylen(kp_);
+  next_lv_ = &(n_->get_lv()[kp_]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    n_ = static_cast<massnode<P>*>(next_lv_->layer());
+    return find_next_leftmost();
+  }
+  next_key_suffix_ = n_->ksuf(kp_);
+  return true;
+}
+
+
 //huanchen-static-scan-multivalue
+//**********************************************************************************
+// stcursor_scan_multivalue::next_item_next
+//**********************************************************************************
 template <typename P>
 inline bool stcursor_scan_multivalue<P>::next_item_next(int kp) {
   int keylenx = 0;
@@ -1228,7 +1995,74 @@ inline bool stcursor_scan_multivalue<P>::next_item_next(int kp) {
   return true;
 }
 
+//huanchen-static-scan-dynamicvalue
+//**********************************************************************************
+// stcursor_scan_dynamicvalue::next_item_next
+//**********************************************************************************
+template <typename P>
+inline bool stcursor_scan_dynamicvalue<P>::next_item_next(int kp) {
+  int keylenx = 0;
+  kp++;
+  next_key_prefix_.pop_back();
+  //out of bound, go back to parent
+  if (kp >= n_->nkeys_)
+    return next_item_from_next_node_next(kp);
+
+  //find the next valid kp
+  while (!n_->isValid(kp)) {
+    kp++;
+    if (kp >= n_->nkeys_)
+      return next_item_from_next_node_next(kp);
+  }
+
+  posTrace_[posTrace_.size() - 1]++;
+  next_key_prefix_.push_back(n_->ikey(kp));
+  keylenx = n_->ikeylen(kp);
+  next_lv_ = &(n_->get_lv()[kp]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    n_ = static_cast<massnode_dynamicvalue<P>*>(next_lv_->layer());
+    return find_next_leftmost();
+  }
+  next_key_suffix_ = n_->ksuf(kp);
+
+  return true;
+}
+
+template <typename P>
+inline bool stcursor_scan_dynamicvalue<P>::next_item_next() {
+  int keylenx = 0;
+  kp_++;
+  next_key_prefix_.pop_back();
+  //out of bound, go back to parent
+  if (kp_ >= n_->nkeys_)
+    return next_item_from_next_node_next();
+
+  //find the next valid kp
+  while (!n_->isValid(kp_)) {
+    kp_++;
+    if (kp_ >= n_->nkeys_)
+      return next_item_from_next_node_next();
+  }
+
+  posTrace_[posTrace_.size() - 1]++;
+  next_key_prefix_.push_back(n_->ikey(kp_));
+  keylenx = n_->ikeylen(kp_);
+  next_lv_ = &(n_->get_lv()[kp_]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    n_ = static_cast<massnode_dynamicvalue<P>*>(next_lv_->layer());
+    return find_next_leftmost();
+  }
+  next_key_suffix_ = n_->ksuf(kp_);
+
+  return true;
+}
+
+
+
 //huanchen-static-scan
+//**********************************************************************************
+// stcursor_scan::next_item_from_next_node_next
+//**********************************************************************************
 template <typename P>
 bool stcursor_scan<P>::next_item_from_next_node_next(int kp) {
   int keylenx = 0;
@@ -1279,7 +2113,60 @@ bool stcursor_scan<P>::next_item_from_next_node_next(int kp) {
   return true;
 }
 
+template <typename P>
+bool stcursor_scan<P>::next_item_from_next_node_next() {
+  int keylenx = 0;
+  int stack_size = nodeTrace_.size();
+  if (stack_size == 0)
+    return false;
+  n_ = nodeTrace_[stack_size - 1];
+  kp_ = posTrace_[stack_size - 1] + 1;
+  nodeTrace_.pop_back();
+  posTrace_.pop_back();
+  next_key_prefix_.pop_back();
+  while (kp_ >= n_->nkeys_) {
+    stack_size = nodeTrace_.size();
+    if (stack_size == 0)
+      return false;
+    n_ = nodeTrace_[stack_size - 1];
+    kp_ = posTrace_[stack_size - 1] + 1;
+    nodeTrace_.pop_back();
+    posTrace_.pop_back();
+    next_key_prefix_.pop_back();
+  }
+
+  //find the next valid kp
+  while (!n_->isValid(kp_)) {
+    kp_++;
+    while (kp_ >= n_->nkeys_) {
+      stack_size = nodeTrace_.size();
+      if (stack_size == 0)
+	return false;
+      n_ = nodeTrace_[stack_size - 1];
+      kp_ = posTrace_[stack_size - 1] + 1;
+      nodeTrace_.pop_back();
+      posTrace_.pop_back();
+      next_key_prefix_.pop_back();
+    }
+  }
+
+  next_key_prefix_.push_back(n_->ikey(kp_));
+  nodeTrace_.push_back(n_);
+  posTrace_.push_back(kp_);
+  keylenx = n_->ikeylen(kp_);
+  next_lv_ = &(n_->get_lv()[kp_]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    n_ = static_cast<massnode<P>*>(next_lv_->layer());
+    return find_next_leftmost();
+  }
+  next_key_suffix_ = n_->ksuf(kp_);
+  return true;
+}
+
 //huanchen-static-scan-multivalue
+//**********************************************************************************
+// stcursor_scan_multivalue::next_item_from_next_node_next
+//**********************************************************************************
 template <typename P>
 bool stcursor_scan_multivalue<P>::next_item_from_next_node_next(int kp) {
   int keylenx = 0;
@@ -1331,7 +2218,119 @@ bool stcursor_scan_multivalue<P>::next_item_from_next_node_next(int kp) {
   return true;
 }
 
+//huanchen-static-scan-dynamicvalue
+//**********************************************************************************
+// stcursor_scan_dynamicvalue::next_item_from_next_node_next
+//**********************************************************************************
+template <typename P>
+bool stcursor_scan_dynamicvalue<P>::next_item_from_next_node_next(int kp) {
+  int keylenx = 0;
+  int stack_size = nodeTrace_.size();
+  if (stack_size == 0)
+    return false;
+  n_ = nodeTrace_[stack_size - 1];
+  kp = posTrace_[stack_size - 1] + 1;
+  nodeTrace_.pop_back();
+  posTrace_.pop_back();
+  next_key_prefix_.pop_back();
+  while (kp >= n_->nkeys_) {
+    stack_size = nodeTrace_.size();
+    if (stack_size == 0)
+      return false;
+    n_ = nodeTrace_[stack_size - 1];
+    kp = posTrace_[stack_size - 1] + 1;
+    nodeTrace_.pop_back();
+    posTrace_.pop_back();
+    next_key_prefix_.pop_back();
+  }
+
+  //find the next valid kp
+  while (!n_->isValid(kp)) {
+    kp++;
+    while (kp >= n_->nkeys_) {
+      stack_size = nodeTrace_.size();
+      if (stack_size == 0)
+	return false;
+      n_ = nodeTrace_[stack_size - 1];
+      kp = posTrace_[stack_size - 1] + 1;
+      nodeTrace_.pop_back();
+      posTrace_.pop_back();
+      next_key_prefix_.pop_back();
+    }
+  }
+
+  next_key_prefix_.push_back(n_->ikey(kp));
+  nodeTrace_.push_back(n_);
+  posTrace_.push_back(kp);
+  keylenx = n_->ikeylen(kp);
+  next_lv_ = &(n_->get_lv()[kp]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    n_ = static_cast<massnode_dynamicvalue<P>*>(next_lv_->layer());
+    return find_next_leftmost();
+  }
+  next_key_suffix_ = n_->ksuf(kp);
+
+  return true;
+}
+
+
+template <typename P>
+bool stcursor_scan_dynamicvalue<P>::next_item_from_next_node_next() {
+  int keylenx = 0;
+  int stack_size = nodeTrace_.size();
+  if (stack_size == 0)
+    return false;
+  n_ = nodeTrace_[stack_size - 1];
+  kp_ = posTrace_[stack_size - 1] + 1;
+  nodeTrace_.pop_back();
+  posTrace_.pop_back();
+  next_key_prefix_.pop_back();
+  while (kp_ >= n_->nkeys_) {
+    stack_size = nodeTrace_.size();
+    if (stack_size == 0)
+      return false;
+    n_ = nodeTrace_[stack_size - 1];
+    kp_ = posTrace_[stack_size - 1] + 1;
+    nodeTrace_.pop_back();
+    posTrace_.pop_back();
+    next_key_prefix_.pop_back();
+  }
+
+  //find the next valid kp
+  while (!n_->isValid(kp_)) {
+    kp_++;
+    while (kp_ >= n_->nkeys_) {
+      stack_size = nodeTrace_.size();
+      if (stack_size == 0)
+	return false;
+      n_ = nodeTrace_[stack_size - 1];
+      kp_ = posTrace_[stack_size - 1] + 1;
+      nodeTrace_.pop_back();
+      posTrace_.pop_back();
+      next_key_prefix_.pop_back();
+    }
+  }
+
+  next_key_prefix_.push_back(n_->ikey(kp_));
+  nodeTrace_.push_back(n_);
+  posTrace_.push_back(kp_);
+  keylenx = n_->ikeylen(kp_);
+  next_lv_ = &(n_->get_lv()[kp_]);
+  if (n_->keylenx_is_layer(keylenx)) {
+    n_ = static_cast<massnode_dynamicvalue<P>*>(next_lv_->layer());
+    return find_next_leftmost();
+  }
+  next_key_suffix_ = n_->ksuf(kp_);
+
+  return true;
+}
+
+
+
 //huanchen-static-scan
+//**********************************************************************************
+// stcursor_scan::lower_bound_binary
+//**********************************************************************************
 template <typename P>
 inline int stcursor_scan<P>::lower_bound_binary() const {
   int l = 0;
@@ -1350,6 +2349,9 @@ inline int stcursor_scan<P>::lower_bound_binary() const {
 }
 
 //huanchen-static-scan-multivalue
+//**********************************************************************************
+// stcursor_scan_multivalue::lower_bound_binary
+//**********************************************************************************
 template <typename P>
 inline int stcursor_scan_multivalue<P>::lower_bound_binary() const {
   int l = 0;
@@ -1367,7 +2369,32 @@ inline int stcursor_scan_multivalue<P>::lower_bound_binary() const {
   return -1;
 }
 
+//huanchen-static-scan-dynamicvalue
+//**********************************************************************************
+// stcursor_scan_dynamicvalue::lower_bound_binary
+//**********************************************************************************
+template <typename P>
+inline int stcursor_scan_dynamicvalue<P>::lower_bound_binary() const {
+  int l = 0;
+  int r = n_->nkeys_;
+  while (l < r) {
+    int m = (l + r) >> 1;
+    int cmp = key_compare(ka_, *n_, m);
+    if (cmp < 0)
+      r = m;
+    else if (cmp == 0)
+      return m;
+    else
+      l = m + 1;
+  }
+  return -1;
+}
+
+
 //huanchen-static-scan
+//**********************************************************************************
+// stcursor_scan::upper_bound_or_equal_binary
+//**********************************************************************************
 template <typename P>
 inline int stcursor_scan<P>::upper_bound_or_equal_binary() {
   isExact_ = true;
@@ -1388,6 +2415,9 @@ inline int stcursor_scan<P>::upper_bound_or_equal_binary() {
 }
 
 //huanchen-static-scan-multivalue
+//**********************************************************************************
+// stcursor_scan_multivalue::upper_bound_or_equal_binary
+//**********************************************************************************
 template <typename P>
 inline int stcursor_scan_multivalue<P>::upper_bound_or_equal_binary() {
   isExact_ = true;
@@ -1407,7 +2437,35 @@ inline int stcursor_scan_multivalue<P>::upper_bound_or_equal_binary() {
   return r;
 }
 
+//huanchen-static-scan-dynamicvalue
+//**********************************************************************************
+// stcursor_scan_dynamicvalue::upper_bound_or_equal_binary
+//**********************************************************************************
+template <typename P>
+inline int stcursor_scan_dynamicvalue<P>::upper_bound_or_equal_binary() {
+  isExact_ = true;
+  int l = 0;
+  int r = n_->nkeys_;
+  while (l < r) {
+    int m = (l + r) >> 1;
+    int cmp = key_compare(ka_, *n_, m);
+    if (cmp < 0)
+      r = m;
+    else if (cmp == 0)
+      return m;
+    else
+      l = m + 1;
+  }
+  isExact_ = false;
+  return r;
+}
+
+
+
 //huanchen-static-merge
+//**********************************************************************************
+// stcursor_merge::merge_nodes
+//**********************************************************************************
 template <typename P>
 bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti_merge) {
   //std::cout << "merge_nodes start\n";
@@ -1437,10 +2495,17 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
   //calculate size & num_keys of m, n and the tmp new node
   int m_size = m_->allocated_size();
   int n_size = n_->allocated_size();
-  int new_max_size = m_size + n_size - sizeof(massnode<P>) - sizeof(uint32_t);
+  int new_max_size; 
   int m_nkeys = m_->size();
   int n_nkeys = n_->size();
   int new_max_nkeys = m_nkeys + n_nkeys;
+
+  bool hasKsuf = (m_->has_ksuf() || n_->has_ksuf());
+
+  if (hasKsuf)
+    new_max_size = m_size + n_size - sizeof(massnode<P>) - sizeof(uint32_t);
+  else
+    new_max_size = m_size + n_size - sizeof(massnode<P>);
 
   //resize(expand) n
   n_ = n_->resize((size_t)new_max_size, ti);
@@ -1480,7 +2545,7 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
   int m_ksuf_startpos = m_ksuf_offset_startpos + m_ksuf_offset_len;
   int new_ksuf_len = new_max_size - new_ksuf_startpos;
   int n_ksuf_len = n_size - n_ksuf_startpos;
-  //int m_ksuf_len = m_size - m_ksuf_startpos;
+  int m_ksuf_len = m_size - m_ksuf_startpos;
 
   //calculate the start position offset of moved arrays in n
   int new_n_ikeylen_startpos = new_ikeylen_startpos + new_ikeylen_len - n_ikeylen_len;
@@ -1508,9 +2573,51 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
   uint32_t* new_n_ksuf_offset = (uint32_t*)((char*)n_ + new_ksuf_offset_startpos);
   char* new_n_ksuf = (char*)((char*)n_ + new_ksuf_startpos);
 
+  if ((n_->ikey(n_nkeys - 1)) < m_ikey[0]) {
+    //std::cout << "merge array\n";
+    if (hasKsuf) {
+      memmove((void*)(new_n_ksuf), (void*)((char*)n_ + n_ksuf_startpos), n_ksuf_len);
+      memmove((void*)(new_n_ksuf_offset), (void*)((char*)n_ + n_ksuf_offset_startpos), n_ksuf_offset_len);
+    }
+    memmove((void*)(new_n_lv), (void*)((char*)n_ + n_lv_startpos), n_lv_len);
+    memmove((void*)(new_n_ikey), (void*)((char*)n_ + n_ikey_startpos), n_ikey_len);
 
-  memmove((void*)(n_ksuf), (void*)((char*)n_ + n_ksuf_startpos), n_ksuf_len);
-  memmove((void*)(n_ksuf_offset), (void*)((char*)n_ + n_ksuf_offset_startpos), n_ksuf_offset_len);
+    if (hasKsuf) {
+      for (int i = 0; i <= m_nkeys; i++)
+	m_ksuf_offset[i] += new_n_ksuf_offset[n_nkeys];
+    }
+    
+    memcpy((void*)((char*)new_n_ikeylen + n_ikeylen_len), (void*)(m_ikeylen), m_ikeylen_len);
+    memcpy((void*)((char*)new_n_ikey + n_ikey_len), (void*)(m_ikey), m_ikey_len);
+    memcpy((void*)((char*)new_n_lv + n_lv_len), (void*)(m_lv), m_lv_len);
+
+    if (hasKsuf) {
+      memcpy((void*)((char*)new_n_ksuf_offset + n_ksuf_offset_len - sizeof(uint32_t)), (void*)(m_ksuf_offset), m_ksuf_offset_len);
+      memcpy((void*)((char*)new_n_ksuf + n_ksuf_len), (void*)(m_ksuf), m_ksuf_len);
+    }
+    //delete m
+    m_->deallocate(ti_merge);
+
+    n_->set_size((uint32_t)new_max_nkeys);
+    n_->set_allocated_size((size_t)new_max_size);
+    if (hasKsuf)
+      n_->set_has_ksuf((uint8_t)1);
+    else
+      n_->set_has_ksuf((uint8_t)0);
+    
+    if (t.parent_node)
+      t.parent_node->set_lv(t.parent_node_pos, leafvalue_static<P>(static_cast<node_base<P>*>(n_)));
+    else
+      root_ = n_;
+    
+    //std::cout << "merge_node success\n";
+    return true;
+  }
+
+  if (hasKsuf) {
+    memmove((void*)(n_ksuf), (void*)((char*)n_ + n_ksuf_startpos), n_ksuf_len);
+    memmove((void*)(n_ksuf_offset), (void*)((char*)n_ + n_ksuf_offset_startpos), n_ksuf_offset_len);
+  }
   memmove((void*)(n_lv), (void*)((char*)n_ + n_lv_startpos), n_lv_len);
   memmove((void*)(n_ikey), (void*)((char*)n_ + n_ikey_startpos), n_ikey_len);
   memmove((void*)(n_ikeylen), (void*)((char*)n_ + n_ikeylen_startpos), n_ikeylen_len);
@@ -1529,12 +2636,44 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
   int copy_ksuf_len = 0;
 
   int start_task_pos = task_.size();
+  /*
+  if (n_ikey[n_nkeys-1] < m_ikey[0]) {
+    //std::cout << "merge array\n";
+    for (int i = 0; i <= m_nkeys; i++)
+      m_ksuf_offset[i] += n_ksuf_offset[n_nkeys];
 
+    memmove((void*)(new_n_ikeylen), (void*)(n_ikeylen), n_ikeylen_len);
+    memcpy((void*)((char*)new_n_ikeylen + n_ikeylen_len), (void*)(m_ikeylen), m_ikeylen_len);
+    memmove((void*)(new_n_ikey), (void*)(n_ikey), n_ikey_len);
+    memcpy((void*)((char*)new_n_ikey + n_ikey_len), (void*)(m_ikey), m_ikey_len);
+    memmove((void*)(new_n_lv), (void*)(n_lv), n_lv_len);
+    memcpy((void*)((char*)new_n_lv + n_lv_len), (void*)(m_lv), m_lv_len);
+    memmove((void*)(new_n_ksuf_offset), (void*)(n_ksuf_offset), n_ksuf_offset_len - sizeof(uint32_t));
+    memcpy((void*)((char*)new_n_ksuf_offset + n_ksuf_offset_len - sizeof(uint32_t)), (void*)(m_ksuf_offset), m_ksuf_offset_len);
+    memmove((void*)(new_n_ksuf), (void*)(n_ksuf), n_ksuf_len);
+    memcpy((void*)((char*)new_n_ksuf + n_ksuf_len), (void*)(m_ksuf), m_ksuf_len);
+
+    //delete m
+    m_->deallocate(ti_merge);
+
+    n_->set_size((uint32_t)new_max_nkeys);
+    n_->set_allocated_size((size_t)new_max_size);
+    
+    if (t.parent_node)
+      t.parent_node->set_lv(t.parent_node_pos, leafvalue_static<P>(static_cast<node_base<P>*>(n_)));
+    else
+      root_ = n_;
+    
+    //std::cout << "merge_node success\n";
+    return true;
+  }
+  */
   while ((m_pos < m_nkeys) && (n_pos < n_nkeys)) {
     //if deleted
     if (n_ikeylen[n_pos] == 0) {
       //std::cout << "item deleted; m_pos = " << m_pos << ", n_pos = " << n_pos << "\n";
-      n_ksuf_pos += (n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos]);
+      if (hasKsuf)
+	n_ksuf_pos += (n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos]);
       n_pos++;
     }
     else {
@@ -1548,21 +2687,25 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
 	new_n_ikey[new_n_pos] = m_ikey[m_pos];
 	new_n_lv[new_n_pos] = m_lv[m_pos];
 
-	copy_ksuf_len = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
-	new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
-
-	if (copy_ksuf_len < 0) {
-	  std::cout << "ERROR: merge_node1, COPY_LENGTH < 0!!!\n";
-	  return false;
+	if (hasKsuf) {
+	  copy_ksuf_len = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
+	  new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+	  
+	  if (copy_ksuf_len < 0) {
+	    std::cout << "ERROR: merge_node1, COPY_LENGTH < 0!!!\n";
+	    return false;
+	  }
+	  
+	  if (copy_ksuf_len > 0)
+	    memcpy(new_n_ksuf_pos, m_ksuf_pos, copy_ksuf_len);
 	}
-
-	if (copy_ksuf_len > 0)
-	  memcpy(new_n_ksuf_pos, m_ksuf_pos, copy_ksuf_len);
 
 	new_n_pos++;
 	m_pos++;
-	new_n_ksuf_pos += copy_ksuf_len;
-	m_ksuf_pos += copy_ksuf_len;
+	if (hasKsuf) {
+	  new_n_ksuf_pos += copy_ksuf_len;
+	  m_ksuf_pos += copy_ksuf_len;
+	}
       }
       else if (m_ikey[m_pos] > n_ikey[n_pos]
 	       || ((m_ikey[m_pos] == n_ikey[n_pos]) && (m_ikey_length > n_ikey_length))) { 
@@ -1572,21 +2715,25 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
 	new_n_ikey[new_n_pos] = n_ikey[n_pos];
 	new_n_lv[new_n_pos] = n_lv[n_pos];
 
-	copy_ksuf_len = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
-	new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
-
-	if (copy_ksuf_len < 0) {
-	  std::cout << "ERROR: merge_node2, COPY_LENGTH < 0!!!\n";
-	  return false;
+	if (hasKsuf) {
+	  copy_ksuf_len = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+	  new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+	  
+	  if (copy_ksuf_len < 0) {
+	    std::cout << "ERROR: merge_node2, COPY_LENGTH < 0!!!\n";
+	    return false;
+	  }
+	  
+	  if (copy_ksuf_len > 0)
+	    memmove(new_n_ksuf_pos, n_ksuf_pos, copy_ksuf_len);
 	}
-
-	if (copy_ksuf_len > 0)
-	  memmove(new_n_ksuf_pos, n_ksuf_pos, copy_ksuf_len);
 
 	new_n_pos++;
 	n_pos++;
-	new_n_ksuf_pos += copy_ksuf_len;
-	n_ksuf_pos += copy_ksuf_len;
+	if (hasKsuf) {
+	  new_n_ksuf_pos += copy_ksuf_len;
+	  n_ksuf_pos += copy_ksuf_len;
+	}
       }
       else { //same keyslice, same ikey length
 	if (m_->keylenx_is_layer(m_ikeylen[m_pos]) && n_->keylenx_is_layer(n_ikeylen[n_pos])) {
@@ -1620,7 +2767,8 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
 	  tt.n = static_cast<massnode<P>*>(n_lv[n_pos].layer());
 
 	  tt.lv_m = m_lv[m_pos];
-	  tt.ksuf_len_m = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
+	  if (hasKsuf)
+	    tt.ksuf_len_m = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
 	  //assign next layer ikeylen
 	  tt.ikeylen_m = convert_to_ikeylen(tt.ksuf_len_m);
 	  //make next layer ikey
@@ -1769,21 +2917,25 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
     new_n_ikey[new_n_pos] = m_ikey[m_pos];
     new_n_lv[new_n_pos] = m_lv[m_pos];
     
-    copy_ksuf_len = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
-    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
-
-    if (copy_ksuf_len < 0) {
-      std::cout << "ERROR: merge_node3, COPY_LENGTH < 0!!!\n";
-      return false;
+    if (hasKsuf) {
+      copy_ksuf_len = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
+      new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+      
+      if (copy_ksuf_len < 0) {
+	std::cout << "ERROR: merge_node3, COPY_LENGTH < 0!!!\n";
+	return false;
+      }
+      
+      if (copy_ksuf_len > 0)
+	memcpy(new_n_ksuf_pos, m_ksuf_pos, copy_ksuf_len);
     }
 
-    if (copy_ksuf_len > 0)
-      memcpy(new_n_ksuf_pos, m_ksuf_pos, copy_ksuf_len);
-    
     new_n_pos++;
     m_pos++;
-    new_n_ksuf_pos += copy_ksuf_len;
-    m_ksuf_pos += copy_ksuf_len;    
+    if (hasKsuf) {
+      new_n_ksuf_pos += copy_ksuf_len;
+      m_ksuf_pos += copy_ksuf_len;    
+    }
   }
 
   //if n has leftovers, shift them to the new positions
@@ -1793,25 +2945,30 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
     new_n_ikey[new_n_pos] = n_ikey[n_pos];
     new_n_lv[new_n_pos] = n_lv[n_pos];
 
-    copy_ksuf_len = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
-    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
-
-    if (copy_ksuf_len < 0) {
-      std::cout << "ERROR: merge_node4, COPY_LENGTH < 0!!!\n";
-      return false;
+    if (hasKsuf) {
+      copy_ksuf_len = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+      new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+      
+      if (copy_ksuf_len < 0) {
+	std::cout << "ERROR: merge_node4, COPY_LENGTH < 0!!!\n";
+	return false;
+      }
+      
+      if (copy_ksuf_len > 0)
+	memmove(new_n_ksuf_pos, n_ksuf_pos, copy_ksuf_len);
     }
-
-    if (copy_ksuf_len > 0)
-      memmove(new_n_ksuf_pos, n_ksuf_pos, copy_ksuf_len);
 
     new_n_pos++;
     n_pos++;
-    new_n_ksuf_pos += copy_ksuf_len;
-    n_ksuf_pos += copy_ksuf_len;
+    if (hasKsuf) {
+      new_n_ksuf_pos += copy_ksuf_len;
+      n_ksuf_pos += copy_ksuf_len;
+    }
   }
 
   //fill in the last ksuf_offset position
-  new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+  if (hasKsuf)
+    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
 
   //delete m
   m_->deallocate(ti_merge);
@@ -1821,15 +2978,27 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
   int new_ikeylen_size = (int)(sizeof(uint8_t) * new_nkeys);
   int new_ikey_size = (int)(sizeof(ikey_type) * new_nkeys);
   int new_lv_size = (int)(sizeof(leafvalue_static<P>) * new_nkeys);
-  int new_ksuf_offset_size = (int)(sizeof(uint32_t) * (new_nkeys + 1));
-  int new_ksuf_size = new_n_ksuf_offset[new_n_pos];
+  int new_ksuf_offset_size = 0;
+  int new_ksuf_size = 0;
+  int new_size;
 
-  int new_size = (int)(sizeof(massnode<P>)
-		       + new_ikeylen_size
-		       + new_ikey_size
-		       + new_lv_size
-		       + new_ksuf_offset_size
-		       + new_ksuf_size);
+  if (hasKsuf) {
+    new_ksuf_offset_size = (int)(sizeof(uint32_t) * (new_nkeys + 1));
+    new_ksuf_size = new_n_ksuf_offset[new_n_pos];
+
+    new_size = (int)(sizeof(massnode<P>)
+		     + new_ikeylen_size
+		     + new_ikey_size
+		     + new_lv_size
+		     + new_ksuf_offset_size
+		     + new_ksuf_size);
+  }
+  else {
+    new_size = (int)(sizeof(massnode<P>)
+		     + new_ikeylen_size
+		     + new_ikey_size
+		     + new_lv_size);
+  }
 
   if (new_nkeys > new_max_nkeys) {
     std::cout << "ERROR: new_nkeys > new_max_nkeys!!!\n";
@@ -1869,6 +3038,10 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
 
   n_->set_size((uint32_t)new_nkeys);
   n_->set_allocated_size((size_t)new_size);
+  if (hasKsuf)
+    n_->set_has_ksuf((uint8_t)1);
+  else
+    n_->set_has_ksuf((uint8_t)0);
 
   if (t.parent_node)
     t.parent_node->set_lv(t.parent_node_pos, leafvalue_static<P>(static_cast<node_base<P>*>(n_)));
@@ -1880,6 +3053,9 @@ bool stcursor_merge<P>::merge_nodes(merge_task t, threadinfo &ti, threadinfo &ti
 }
 
 //huanchen-static-merge
+//**********************************************************************************
+// stcursor_merge::add_item_to_node
+//**********************************************************************************
 template <typename P>
 bool stcursor_merge<P>::add_item_to_node(merge_task t, threadinfo &ti) {
   //std::cout << "add_item_to_node\n";
@@ -2261,6 +3437,9 @@ bool stcursor_merge<P>::add_item_to_node(merge_task t, threadinfo &ti) {
 }
 
 //huanchen-static-merge
+//**********************************************************************************
+// stcursor_merge::create_node
+//**********************************************************************************
 template <typename P>
 bool stcursor_merge<P>::create_node(merge_task t, threadinfo &ti) {
   //std::cout << "create_node\n";
@@ -2270,7 +3449,7 @@ bool stcursor_merge<P>::create_node(merge_task t, threadinfo &ti) {
   if ((t.ikey_m == t.ikey_n) && (t.ikeylen_m == t.ikeylen_n)) {
     ksufSize = 0;
     nkeys = 1;
-    n_ = massnode<P>::make(ksufSize, nkeys, ti);
+    n_ = massnode<P>::make(ksufSize, true, nkeys, ti);
     n_->set_ikeylen(0, (uint8_t)(t.ikeylen_n + (uint8_t)64));
     n_->set_ikey(0, t.ikey_n);
     //lv TBD
@@ -2324,7 +3503,7 @@ bool stcursor_merge<P>::create_node(merge_task t, threadinfo &ti) {
   else {
     ksufSize = t.ksuf_len_m + t.ksuf_len_n;
     nkeys = 2;
-    n_ = massnode<P>::make(ksufSize, nkeys, ti);
+    n_ = massnode<P>::make(ksufSize, true, nkeys, ti);
 
     if ((t.ikey_m < t.ikey_n)
 	|| ((t.ikey_m == t.ikey_n) && (t.ikeylen_m < t.ikeylen_n))) {
@@ -2391,6 +3570,9 @@ bool stcursor_merge<P>::create_node(merge_task t, threadinfo &ti) {
 }
 
 //huanchen-static-merge
+//**********************************************************************************
+// stcursor_merge::merge
+//**********************************************************************************
 template <typename P>
 bool stcursor_merge<P>::merge(threadinfo &ti, threadinfo &ti_merge) {
   merge_task t;
@@ -2425,6 +3607,9 @@ bool stcursor_merge<P>::merge(threadinfo &ti, threadinfo &ti_merge) {
 }
 
 //huanchen-static-merge
+//**********************************************************************************
+// stcursor_merge::convert_to_ikeylen
+//**********************************************************************************
 template <typename P>
 inline uint8_t stcursor_merge<P>::convert_to_ikeylen(uint32_t len) {
   uint8_t ikeylen = (uint8_t)0;
@@ -2455,6 +3640,9 @@ inline uint8_t stcursor_merge<P>::convert_to_ikeylen(uint32_t len) {
 
 
 //huanchen-static-merge-multivalue
+//**********************************************************************************
+// stcursor_merge_multivalue::merge_nodes
+//**********************************************************************************
 template <typename P>
 bool stcursor_merge_multivalue<P>::merge_nodes(merge_task_multivalue t, threadinfo &ti, threadinfo &ti_merge) {
   //std::cout << "merge_nodes(multivalue) start$$$$$$$$$$$\n";
@@ -3108,6 +4296,9 @@ bool stcursor_merge_multivalue<P>::merge_nodes(merge_task_multivalue t, threadin
 
 
 //huanchen-static-merge-multivalue
+//**********************************************************************************
+// stcursor_merge_multivalue::add_item_to_node
+//**********************************************************************************
 template <typename P>
 bool stcursor_merge_multivalue<P>::add_item_to_node(merge_task_multivalue t, threadinfo &ti) {
   //std::cout << "add_item_to_node(multivalue) start$$$$$$$$$$\n";
@@ -3641,6 +4832,9 @@ bool stcursor_merge_multivalue<P>::add_item_to_node(merge_task_multivalue t, thr
 }
 
 //huanchen-static-merge-multivalue
+//**********************************************************************************
+// stcursor_merge_multivalue::create_node
+//**********************************************************************************
 template <typename P>
 bool stcursor_merge_multivalue<P>::create_node(merge_task_multivalue t, threadinfo &ti) {
   //std::cout << "create_node(multivalue) start$$$$$$$$$$\n";
@@ -3797,6 +4991,9 @@ bool stcursor_merge_multivalue<P>::create_node(merge_task_multivalue t, threadin
 }
 
 //huanchen-static-merge-multivalue
+//**********************************************************************************
+// stcursor_merge_multivalue::merge
+//**********************************************************************************
 template <typename P>
 bool stcursor_merge_multivalue<P>::merge(threadinfo &ti, threadinfo &ti_merge) {
   merge_task_multivalue t;
@@ -3833,6 +5030,9 @@ bool stcursor_merge_multivalue<P>::merge(threadinfo &ti, threadinfo &ti_merge) {
 }
 
 //huanchen-static-merge-multivalue
+//**********************************************************************************
+// stcursor_merge_multivalue::convert_to_ikeylen
+//**********************************************************************************
 template <typename P>
 inline uint8_t stcursor_merge_multivalue<P>::convert_to_ikeylen(uint32_t len) {
   uint8_t ikeylen = (uint8_t)0;
@@ -3861,10 +5061,1078 @@ inline uint8_t stcursor_merge_multivalue<P>::convert_to_ikeylen(uint32_t len) {
   return ikeylen;
 }
 
+
+
+
+//huanchen-static-merge-dynamicvalue
+//**********************************************************************************
+// stcursor_merge_dynamicvalue::merge_nodes
+//**********************************************************************************
+template <typename P>
+bool stcursor_merge_dynamicvalue<P>::merge_nodes(merge_task_dynamicvalue t, threadinfo &ti, threadinfo &ti_merge) {
+  //std::cout << "merge_nodes(dynamicvalue) start$$$$$$$$$$$\n";
+  //std::cout << "alloc1 = " << ti.alloc << "\n";
+  /*
+  if ((t.m == NULL) || (t.n == NULL)) {
+    std::cout << "ERROR: merge_node(dynamicvalue), node m or n is NULL!!!\n";
+    return false;
+  }
+
+  m_ = t.m;
+  n_ = t.n;
+  */
+
+  if (t.m == NULL) {
+    std::cout << "ERROR: merge_node, node m is NULL!!!\n";
+    return false;
+  }
+  m_ = t.m;
+
+  if (t.n == NULL) {
+    root_ = m_;
+    return true;
+  }
+  else
+    n_ = t.n;
+
+  //calculate size & num_keys of m, n and the tmp new node
+  int m_size = m_->allocated_size();
+  int n_size = n_->allocated_size();
+  int new_max_size = m_size + n_size - sizeof(massnode_dynamicvalue<P>) - sizeof(uint32_t);
+  int m_nkeys = m_->size();
+  int n_nkeys = n_->size();
+  int new_max_nkeys = m_nkeys + n_nkeys;
+
+  //resize(expand) n
+  n_ = n_->resize((size_t)new_max_size, ti);
+  //n_->set_allocated_size((size_t)new_max_size);
+  //std::cout << "alloc2 = " << ti.alloc << "\n";
+
+  //calculate the start position offsets of each array in m, n and tmp new
+  int new_ikeylen_startpos = sizeof(massnode_dynamicvalue<P>);
+  int n_ikeylen_startpos = sizeof(massnode_dynamicvalue<P>);
+  int m_ikeylen_startpos = sizeof(massnode_dynamicvalue<P>);
+  int new_ikeylen_len = (int)(sizeof(uint8_t) * new_max_nkeys);
+  int n_ikeylen_len = (int)(sizeof(uint8_t) * n_nkeys);
+  int m_ikeylen_len = (int)(sizeof(uint8_t) * m_nkeys);
+
+  int new_ikey_startpos = new_ikeylen_startpos + new_ikeylen_len;
+  int n_ikey_startpos = n_ikeylen_startpos + n_ikeylen_len;
+  int m_ikey_startpos = m_ikeylen_startpos + m_ikeylen_len;
+  int new_ikey_len = (int)(sizeof(ikey_type) * new_max_nkeys);
+  int n_ikey_len = (int)(sizeof(ikey_type) * n_nkeys);
+  int m_ikey_len = (int)(sizeof(ikey_type) * m_nkeys);
+
+  int new_lv_startpos = new_ikey_startpos + new_ikey_len;
+  int n_lv_startpos = n_ikey_startpos + n_ikey_len;
+  int m_lv_startpos = m_ikey_startpos + m_ikey_len;
+  int new_lv_len = (int)(sizeof(leafvalue<P>) * new_max_nkeys);
+  int n_lv_len = (int)(sizeof(leafvalue<P>) * n_nkeys);
+  int m_lv_len = (int)(sizeof(leafvalue<P>) * m_nkeys);
+
+  int new_ksuf_offset_startpos = new_lv_startpos + new_lv_len;
+  int n_ksuf_offset_startpos = n_lv_startpos + n_lv_len;
+  int m_ksuf_offset_startpos = m_lv_startpos + m_lv_len;
+  int new_ksuf_offset_len = (int)(sizeof(uint32_t) * (new_max_nkeys + 1));
+  int n_ksuf_offset_len = (int)(sizeof(uint32_t) * (n_nkeys + 1));
+  int m_ksuf_offset_len = (int)(sizeof(uint32_t) * (m_nkeys + 1));
+
+  int new_ksuf_startpos = new_ksuf_offset_startpos + new_ksuf_offset_len;
+  int n_ksuf_startpos = n_ksuf_offset_startpos + n_ksuf_offset_len;
+  int m_ksuf_startpos = m_ksuf_offset_startpos + m_ksuf_offset_len;
+  int new_ksuf_len = new_max_size - new_ksuf_startpos;
+  int n_ksuf_len = n_size - n_ksuf_startpos;
+  int m_ksuf_len = m_size - m_ksuf_startpos;
+
+  //calculate the start position offset of moved arrays in n
+  int new_n_ikeylen_startpos = new_ikeylen_startpos + new_ikeylen_len - n_ikeylen_len;
+  int new_n_ikey_startpos = new_ikey_startpos + new_ikey_len - n_ikey_len;
+  int new_n_lv_startpos = new_lv_startpos + new_lv_len - n_lv_len;
+  int new_n_ksuf_offset_startpos = new_ksuf_offset_startpos + new_ksuf_offset_len - n_ksuf_offset_len;
+  int new_n_ksuf_startpos = new_ksuf_startpos + new_ksuf_len - n_ksuf_len;
+
+  //move the arrays in n and prepare for merging
+  uint8_t* m_ikeylen = (uint8_t*)((char*)m_ + m_ikeylen_startpos);
+  ikey_type* m_ikey = (ikey_type*)((char*)m_ + m_ikey_startpos);
+  leafvalue<P>* m_lv = (leafvalue<P>*)((char*)m_ + m_lv_startpos);
+  uint32_t* m_ksuf_offset = (uint32_t*)((char*)m_ + m_ksuf_offset_startpos);
+  char* m_ksuf = (char*)((char*)m_ + m_ksuf_startpos);
+
+  uint8_t* n_ikeylen = (uint8_t*)((char*)n_ + new_n_ikeylen_startpos);
+  ikey_type* n_ikey = (ikey_type*)((char*)n_ + new_n_ikey_startpos);
+  leafvalue<P>* n_lv = (leafvalue<P>*)((char*)n_ + new_n_lv_startpos);
+  uint32_t* n_ksuf_offset = (uint32_t*)((char*)n_ + new_n_ksuf_offset_startpos);
+  char* n_ksuf = (char*)((char*)n_ + new_n_ksuf_startpos);
+
+  uint8_t* new_n_ikeylen = (uint8_t*)((char*)n_ + new_ikeylen_startpos);
+  ikey_type* new_n_ikey = (ikey_type*)((char*)n_ + new_ikey_startpos);
+  leafvalue<P>* new_n_lv = (leafvalue<P>*)((char*)n_ + new_lv_startpos);
+  uint32_t* new_n_ksuf_offset = (uint32_t*)((char*)n_ + new_ksuf_offset_startpos);
+  char* new_n_ksuf = (char*)((char*)n_ + new_ksuf_startpos);
+
+  memmove((void*)(n_ksuf), (void*)((char*)n_ + n_ksuf_startpos), n_ksuf_len);
+  memmove((void*)(n_ksuf_offset), (void*)((char*)n_ + n_ksuf_offset_startpos), n_ksuf_offset_len);
+  memmove((void*)(n_lv), (void*)((char*)n_ + n_lv_startpos), n_lv_len);
+  memmove((void*)(n_ikey), (void*)((char*)n_ + n_ikey_startpos), n_ikey_len);
+  memmove((void*)(n_ikeylen), (void*)((char*)n_ + n_ikeylen_startpos), n_ikeylen_len);
+
+  //merge
+  //---------------------------------------------------------------------------------
+  int m_pos = 0;
+  int n_pos = 0;
+  int new_n_pos = 0;
+
+  char* new_n_ksuf_pos = new_n_ksuf;
+  char* m_ksuf_pos = m_ksuf;
+  char* n_ksuf_pos = n_ksuf;
+
+  int copy_ksuf_len = 0;
+
+  int start_task_pos = task_.size();
+
+  while ((m_pos < m_nkeys) && (n_pos < n_nkeys)) {
+    //if deleted
+    if (n_ikeylen[n_pos] == 0) {
+      //std::cout << "item deleted; m_pos = " << m_pos << ", n_pos = " << n_pos << "\n";
+      n_ksuf_pos += (n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos]);
+      n_pos++;
+    }
+    else {
+      uint8_t m_ikey_length = m_->keylenx_ikeylen(m_ikeylen[m_pos]);
+      uint8_t n_ikey_length = n_->keylenx_ikeylen(n_ikeylen[n_pos]);
+      if (m_ikey[m_pos] < n_ikey[n_pos]
+	  || ((m_ikey[m_pos] == n_ikey[n_pos]) && (m_ikey_length < n_ikey_length))) { 
+	//std::cout << "item_m inserted; m_pos = " << m_pos << ", n_pos = " << n_pos << "\n";
+	//move an item from m to the new array
+	new_n_ikeylen[new_n_pos] = m_ikeylen[m_pos];
+	new_n_ikey[new_n_pos] = m_ikey[m_pos];
+	new_n_lv[new_n_pos] = m_lv[m_pos];
+
+	copy_ksuf_len = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
+	new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+	if (copy_ksuf_len < 0) {
+	  std::cout << "ERROR: merge_node1(dynamicvalue), COPY_LENGTH < 0!!!\n";
+	  return false;
+	}
+
+	if (copy_ksuf_len > 0)
+	  memcpy(new_n_ksuf_pos, m_ksuf_pos, copy_ksuf_len);
+
+	new_n_pos++;
+	m_pos++;
+	new_n_ksuf_pos += copy_ksuf_len;
+	m_ksuf_pos += copy_ksuf_len;
+      }
+      else if (m_ikey[m_pos] > n_ikey[n_pos]
+	       || ((m_ikey[m_pos] == n_ikey[n_pos]) && (m_ikey_length > n_ikey_length))) { 
+	//std::cout << "item_n inserted, m_pos = " << m_pos << ", n_pos = " << n_pos << "\n";
+	//move an item from n to the new array
+	new_n_ikeylen[new_n_pos] = n_ikeylen[n_pos];
+	new_n_ikey[new_n_pos] = n_ikey[n_pos];
+	new_n_lv[new_n_pos] = n_lv[n_pos];
+
+	copy_ksuf_len = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+	new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+	if (copy_ksuf_len < 0) {
+	  std::cout << "n_ksuf_offset[" << (n_pos + 1) << "] = " << n_ksuf_offset[n_pos + 1] << "\n";
+	  std::cout << "n_ksuf_offset[" << n_pos << "] = " << n_ksuf_offset[n_pos] << "\n";
+	  std::cout << "ERROR: merge_node2(dynamicvalue), COPY_LENGTH < 0!!!\n";
+	  return false;
+	}
+
+	if (copy_ksuf_len > 0)
+	  memmove(new_n_ksuf_pos, n_ksuf_pos, copy_ksuf_len);
+
+	new_n_pos++;
+	n_pos++;
+	new_n_ksuf_pos += copy_ksuf_len;
+	n_ksuf_pos += copy_ksuf_len;
+      }
+      else { //same keyslice, same ikey length
+	if (m_->keylenx_is_layer(m_ikeylen[m_pos]) && n_->keylenx_is_layer(n_ikeylen[n_pos])) {
+	  //std::cout << "both layers; m_pos = " << m_pos << ", n_pos = " << n_pos << "\n";
+	  //if m_pos is layer AND n_pos is layer
+	  new_n_ikeylen[new_n_pos] = n_ikeylen[n_pos];
+	  new_n_ikey[new_n_pos] = n_ikey[n_pos];
+	  //lv TBD
+	  new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+	  merge_task_dynamicvalue tt;
+	  tt.task = 0; //merge node m to n
+	  tt.parent_node = n_;
+	  tt.parent_node_pos = new_n_pos;
+	  tt.m = static_cast<massnode_dynamicvalue<P>*>(m_lv[m_pos].layer());
+	  tt.n = static_cast<massnode_dynamicvalue<P>*>(n_lv[n_pos].layer());
+
+	  task_.push_back(tt);
+	}
+	else if (n_->keylenx_is_layer(n_ikeylen[n_pos])) {
+	  //std::cout << "n layer; m_pos = " << m_pos << ", n_pos = " << n_pos << "\n";
+	  //if n_pos is layer
+	  new_n_ikeylen[new_n_pos] = n_ikeylen[n_pos];
+	  new_n_ikey[new_n_pos] = n_ikey[n_pos];
+	  //lv TBD
+	  new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+	  merge_task_dynamicvalue tt;
+	  tt.task = 1; //merge item_m to n
+	  tt.parent_node = n_;
+	  tt.parent_node_pos = new_n_pos;
+	  tt.n = static_cast<massnode_dynamicvalue<P>*>(n_lv[n_pos].layer());
+
+	  tt.lv_m = m_lv[m_pos];
+
+	  tt.ksuf_len_m = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
+	  //assign next layer ikeylen
+	  tt.ikeylen_m = convert_to_ikeylen(tt.ksuf_len_m);
+	  //make next layer ikey
+	  tt.ikey_m = string_slice<ikey_type>::make_comparable_sloppy(m_ksuf_pos, tt.ksuf_len_m);
+	    
+	  //make next layer suffix
+	  if (tt.ksuf_len_m > sizeof(ikey_type)) {
+	    tt.ksuf_len_m -= sizeof(ikey_type);
+	    tt.ksuf_m = (char*)malloc(tt.ksuf_len_m + 1);
+	    memcpy((void*)tt.ksuf_m, (const void*)(m_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_m);
+	  }
+	  else {
+	    tt.ksuf_m = 0;
+	    tt.ksuf_len_m = 0;
+	  }
+
+	  task_.push_back(tt);
+	  m_ksuf_pos += (m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos]);
+	}
+	else if (m_->keylenx_is_layer(m_ikeylen[m_pos])) {
+	  //std::cout << "m layer; m_pos = " << m_pos << ", n_pos = " << n_pos << "\n";
+	  //if m_pos is layer
+	  new_n_ikeylen[new_n_pos] = m_ikeylen[m_pos];
+	  new_n_ikey[new_n_pos] = m_ikey[m_pos];
+	  //lv TBD
+	  new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+	  merge_task_dynamicvalue tt;
+	  tt.task = 1; //merge item m to n
+	  tt.parent_node = n_;
+	  tt.parent_node_pos = new_n_pos;
+	  tt.n = static_cast<massnode_dynamicvalue<P>*>(m_lv[m_pos].layer());
+
+	  tt.lv_m = n_lv[n_pos];
+
+	  tt.ksuf_len_m = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+	  //assign next layer ikeylen
+	  tt.ikeylen_m = convert_to_ikeylen(tt.ksuf_len_m);
+	  //make next layer ikey
+	  tt.ikey_m = string_slice<ikey_type>::make_comparable_sloppy(n_ksuf_pos, tt.ksuf_len_m);
+	    
+	  //make next layer suffix
+	  if (tt.ksuf_len_m > sizeof(ikey_type)) {
+	    tt.ksuf_len_m -= sizeof(ikey_type);
+	    tt.ksuf_m = (char*)malloc(tt.ksuf_len_m + 1);
+	    memcpy((void*)tt.ksuf_m, (const void*)(n_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_m);
+	  }
+	  else {
+	    tt.ksuf_m = 0;
+	    tt.ksuf_len_m = 0;
+	  }
+
+	  task_.push_back(tt);
+	  n_ksuf_pos += (n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos]);
+	}
+	else {
+	  //std::cout << "both NOT layer; m_pos = " << m_pos << ", n_pos = " << n_pos << "\n";
+	  //if neither m_pos nor n_pos is layer
+	  //values
+	  int ksuflen_m = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
+	  int ksuflen_n = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+	  if ((ksuflen_m == 0) && (ksuflen_n == 0)) {
+	    std::cout << "Error1: same key!\n";
+	    return false;
+	  }
+	  else if ((ksuflen_m == ksuflen_n) 
+		   && (strncmp(m_ksuf_pos, n_ksuf_pos, ksuflen_m) == 0)) {
+	    std::cout << "Error2: same key!\n";
+	    return false;
+	  }
+	  else {
+	    //std::cout << "both NOT layer 3; m_pos = " << m_pos << ", n_pos = " << n_pos << "\n";
+	    new_n_ikeylen[new_n_pos] = (uint8_t)(n_ikeylen[n_pos] + (uint8_t)64);
+	    new_n_ikey[new_n_pos] = n_ikey[n_pos];
+	    //lv TBD
+	    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+	    merge_task_dynamicvalue tt;
+	    tt.task = 2; //create a new node to include m and n
+	    tt.parent_node = n_;
+	    tt.parent_node_pos = new_n_pos;
+
+	    tt.lv_m = m_lv[m_pos];
+
+	    tt.ksuf_len_m = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
+	    //assign m next layer ikeylen
+	    tt.ikeylen_m = convert_to_ikeylen(tt.ksuf_len_m);
+	    //make m next layer ikey
+	    tt.ikey_m = string_slice<ikey_type>::make_comparable_sloppy(m_ksuf_pos, tt.ksuf_len_m);
+	    
+	    //make m next layer suffix
+	    if (tt.ksuf_len_m > sizeof(ikey_type)) {
+	      tt.ksuf_len_m -= sizeof(ikey_type);
+	      tt.ksuf_m = (char*)malloc(tt.ksuf_len_m + 1);
+	      memcpy((void*)tt.ksuf_m, (const void*)(m_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_m);
+	    }
+	    else {
+	      tt.ksuf_m = 0;
+	      tt.ksuf_len_m = 0;
+	    }
+
+
+	    tt.lv_n = n_lv[n_pos];
+	    tt.ksuf_len_n = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+	    //assign n next layer ikeylen
+	    tt.ikeylen_n = convert_to_ikeylen(tt.ksuf_len_n);
+	    //make n next layer ikey
+	    tt.ikey_n = string_slice<ikey_type>::make_comparable_sloppy(n_ksuf_pos, tt.ksuf_len_n);
+	    
+	    //make n next layer suffix
+	    if (tt.ksuf_len_n > sizeof(ikey_type)) {
+	      tt.ksuf_len_n -= sizeof(ikey_type);
+	      tt.ksuf_n = (char*)malloc(tt.ksuf_len_n + 1);
+	      memcpy((void*)tt.ksuf_n, (const void*)(n_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_n);
+	    }
+	    else {
+	      tt.ksuf_n = 0;
+	      tt.ksuf_len_n = 0;
+	    }
+
+	    task_.push_back(tt);
+	    m_ksuf_pos += (m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos]);
+	    n_ksuf_pos += (n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos]);
+	  }
+	}
+
+	new_n_pos++;
+	m_pos++;
+	n_pos++;
+      } //same keyslice, same ikey length else end
+    } //else end
+  } //while end
+
+  //if m has leftovers, move them to the new node
+  while (m_pos < m_nkeys) {
+    //std::cout << "m leftovers; m_pos = " << m_pos <<"\n";
+    new_n_ikeylen[new_n_pos] = m_ikeylen[m_pos];
+    new_n_ikey[new_n_pos] = m_ikey[m_pos];
+    new_n_lv[new_n_pos] = m_lv[m_pos];
+
+    copy_ksuf_len = m_ksuf_offset[m_pos + 1] - m_ksuf_offset[m_pos];
+    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+    if (copy_ksuf_len < 0) {
+      std::cout << "ERROR: merge_node3(dynamicvalue), COPY_LENGTH < 0!!!\n";
+      std::cout << "m_ksuf_offset[" << (m_pos + 1) << "] = " << m_ksuf_offset[m_pos + 1] << "\n";
+      std::cout << "m_ksuf_offset[" << m_pos << "] = " << m_ksuf_offset[m_pos] << "\n";
+      return false;
+    }
+
+    if (copy_ksuf_len > 0)
+      memcpy(new_n_ksuf_pos, m_ksuf_pos, copy_ksuf_len);
+    
+    //new_nkeys++;
+    new_n_pos++;
+    m_pos++;
+    new_n_ksuf_pos += copy_ksuf_len;
+    m_ksuf_pos += copy_ksuf_len;
+  }
+
+  //if n has leftovers, shift them to the new positions
+  while (n_pos < n_nkeys) {
+    //std::cout << "n leftovers; n_pos = " << n_pos << "\n";
+    new_n_ikeylen[new_n_pos] = n_ikeylen[n_pos];
+    new_n_ikey[new_n_pos] = n_ikey[n_pos];
+    new_n_lv[new_n_pos] = n_lv[n_pos];
+
+    copy_ksuf_len = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+    if (copy_ksuf_len < 0) {
+      std::cout << "ERROR: merge_node4(dynamicvalue), COPY_LENGTH < 0!!!\n";
+      return false;
+    }
+
+    if (copy_ksuf_len > 0)
+      memmove(new_n_ksuf_pos, n_ksuf_pos, copy_ksuf_len);
+
+    new_n_pos++;
+    n_pos++;
+    new_n_ksuf_pos += copy_ksuf_len;
+    n_ksuf_pos += copy_ksuf_len;
+  }
+
+  //fill in the last ksuf_offset position
+  new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+  //delete m
+  m_->deallocate(ti_merge);
+
+  //compact n if needed
+  int new_nkeys = new_n_pos;
+  int new_ikeylen_size = (int)(sizeof(uint8_t) * new_nkeys);
+  int new_ikey_size = (int)(sizeof(ikey_type) * new_nkeys);
+  int new_lv_size = (int)(sizeof(leafvalue<P>) * new_nkeys);
+  int new_ksuf_offset_size = (int)(sizeof(uint32_t) * (new_nkeys + 1));
+  int new_ksuf_size = new_n_ksuf_offset[new_n_pos];
+
+  int new_size = (int)(sizeof(massnode_dynamicvalue<P>)
+		       + new_ikeylen_size
+		       + new_ikey_size
+		       + new_lv_size
+		       + new_ksuf_offset_size
+		       + new_ksuf_size);
+
+  if (new_nkeys > new_max_nkeys) {
+    std::cout << "ERROR: new_nkeys > new_max_nkeys!!!\n";
+    return false;
+  }
+
+  if (new_nkeys < new_max_nkeys) {
+    uint8_t* final_n_ikeylen = (uint8_t*)((char*)n_ + sizeof(massnode_dynamicvalue<P>));
+    ikey_type* final_n_ikey = (ikey_type*)((char*)n_ + sizeof(massnode_dynamicvalue<P>)
+					   + new_ikeylen_size);
+    leafvalue<P>* final_n_lv 
+      = (leafvalue<P>*)((char*)n_ + sizeof(massnode_dynamicvalue<P>)
+					  + new_ikeylen_size
+					  + new_ikey_size);
+    uint32_t* final_n_ksuf_offset = (uint32_t*)((char*)n_ + sizeof(massnode_dynamicvalue<P>)
+						+ new_ikeylen_size
+						+ new_ikey_size
+						+ new_lv_size);
+    char* final_n_ksuf = (char*)((char*)n_ + sizeof(massnode_dynamicvalue<P>)
+				 + new_ikeylen_size
+				 + new_ikey_size
+				 + new_lv_size
+				 + new_ksuf_offset_size);
+  
+    memmove((void*)final_n_ikey, (const void*)new_n_ikey, new_ikey_size);
+    memmove((void*)final_n_lv, (const void*)new_n_lv, new_lv_size);
+    memmove((void*)final_n_ksuf_offset, (const void*)new_n_ksuf_offset, new_ksuf_offset_size);
+    memmove((void*)final_n_ksuf, (const void*)new_n_ksuf, new_ksuf_size);
+
+    //resize(shrink) n
+    n_->set_allocated_size((size_t)new_max_size);
+    n_ = n_->resize((size_t)new_size, ti);
+    //std::cout << "alloc3 = " << ti.alloc << "\n";
+
+    //resize may change the address, update the parent nodes addr in task_
+    for (int i = start_task_pos; i < task_.size(); i++)
+      task_[i].parent_node = n_;
+  }
+
+  n_->set_size((uint32_t)new_nkeys);
+  n_->set_allocated_size((size_t)new_size);
+
+  if (t.parent_node)
+    t.parent_node->set_lv(t.parent_node_pos, leafvalue<P>(static_cast<node_base<P>*>(n_)));
+  else
+    root_ = n_;
+  //std::cout << "alloc4 = " << ti.alloc << "\n";
+  return true;
+}
+
+
+//huanchen-static-merge-dynamicvalue
+//**********************************************************************************
+// stcursor_merge_dynamicvalue::add_item_to_node
+//**********************************************************************************
+template <typename P>
+bool stcursor_merge_dynamicvalue<P>::add_item_to_node(merge_task_dynamicvalue t, threadinfo &ti) {
+  //std::cout << "add_item_to_node(dynamicvalue) start$$$$$$$$$$\n";
+  if (t.n == NULL) {
+    std::cout << "ERROR: add_item_to_node(dynamicvalue), node n is NULL!!!\n";
+    return false;
+  }
+
+  n_ = t.n;
+
+  int m_size = (int)(sizeof(uint8_t)
+		     + sizeof(ikey_type)
+		     + sizeof(leafvalue<P>)
+		     + sizeof(uint32_t)
+		     + t.ksuf_len_m);
+  int n_size = n_->allocated_size();
+  int new_max_size = m_size + n_size;
+  int n_nkeys = n_->size();
+  int new_max_nkeys = n_nkeys + 1;
+
+  //resize(expand) n
+  n_ = n_->resize((size_t)new_max_size, ti);
+  n_->set_allocated_size((size_t)new_max_size);
+
+  //calculate the start position offsets of each array in n and tmp new
+  int new_ikeylen_startpos = sizeof(massnode_dynamicvalue<P>);
+  int n_ikeylen_startpos = sizeof(massnode_dynamicvalue<P>);
+  int new_ikeylen_len = (int)(sizeof(uint8_t) * new_max_nkeys);
+  int n_ikeylen_len = (int)(sizeof(uint8_t) * n_nkeys);
+
+  int new_ikey_startpos = new_ikeylen_startpos + new_ikeylen_len;
+  int n_ikey_startpos = n_ikeylen_startpos + n_ikeylen_len;
+  int new_ikey_len = (int)(sizeof(ikey_type) * new_max_nkeys);
+  int n_ikey_len = (int)(sizeof(ikey_type) * n_nkeys);
+
+  int new_lv_startpos = new_ikey_startpos + new_ikey_len;
+  int n_lv_startpos = n_ikey_startpos + n_ikey_len;
+  int new_lv_len = (int)(sizeof(leafvalue<P>) * new_max_nkeys);
+  int n_lv_len = (int)(sizeof(leafvalue<P>) * n_nkeys);
+
+  int new_ksuf_offset_startpos = new_lv_startpos + new_lv_len;
+  int n_ksuf_offset_startpos = n_lv_startpos + n_lv_len;
+  int new_ksuf_offset_len = (int)(sizeof(uint32_t) * (new_max_nkeys + 1));
+  int n_ksuf_offset_len = (int)(sizeof(uint32_t) * (n_nkeys + 1));
+
+  int new_ksuf_startpos = new_ksuf_offset_startpos + new_ksuf_offset_len;
+  int n_ksuf_startpos = n_ksuf_offset_startpos + n_ksuf_offset_len;
+  int new_ksuf_len = new_max_size - new_ksuf_startpos;
+  int n_ksuf_len = n_size - n_ksuf_startpos;
+
+  //calculate the start position offset of moved arrays in n
+  int new_n_ikeylen_startpos = new_ikeylen_startpos + new_ikeylen_len - n_ikeylen_len;
+  int new_n_ikey_startpos = new_ikey_startpos + new_ikey_len - n_ikey_len;
+  int new_n_lv_startpos = new_lv_startpos + new_lv_len - n_lv_len;
+  int new_n_ksuf_offset_startpos = new_ksuf_offset_startpos + new_ksuf_offset_len - n_ksuf_offset_len;
+  int new_n_ksuf_startpos = new_ksuf_startpos + new_ksuf_len - n_ksuf_len;
+
+  //move the arrays in n and prepare for merging
+  uint8_t* n_ikeylen = (uint8_t*)((char*)n_ + new_n_ikeylen_startpos);
+  ikey_type* n_ikey = (ikey_type*)((char*)n_ + new_n_ikey_startpos);
+  leafvalue<P>* n_lv = (leafvalue<P>*)((char*)n_ + new_n_lv_startpos);
+  uint32_t* n_ksuf_offset = (uint32_t*)((char*)n_ + new_n_ksuf_offset_startpos);
+  char* n_ksuf = (char*)((char*)n_ + new_n_ksuf_startpos);
+
+  uint8_t* new_n_ikeylen = (uint8_t*)((char*)n_ + new_ikeylen_startpos);
+  ikey_type* new_n_ikey = (ikey_type*)((char*)n_ + new_ikey_startpos);
+  leafvalue<P>* new_n_lv = (leafvalue<P>*)((char*)n_ + new_lv_startpos);
+  uint32_t* new_n_ksuf_offset = (uint32_t*)((char*)n_ + new_ksuf_offset_startpos);
+  char* new_n_ksuf = (char*)((char*)n_ + new_ksuf_startpos);
+
+  memmove((void*)(n_ksuf), (void*)((char*)n_ + n_ksuf_startpos), n_ksuf_len);
+  memmove((void*)(n_ksuf_offset), (void*)((char*)n_ + n_ksuf_offset_startpos), n_ksuf_offset_len);
+  memmove((void*)(n_lv), (void*)((char*)n_ + n_lv_startpos), n_lv_len);
+  memmove((void*)(n_ikey), (void*)((char*)n_ + n_ikey_startpos), n_ikey_len);
+  memmove((void*)(n_ikeylen), (void*)((char*)n_ + n_ikeylen_startpos), n_ikeylen_len);
+
+  //merge
+  //---------------------------------------------------------------------------------
+  bool m_inserted = false;
+  int n_pos = 0;
+  int new_n_pos = 0;
+  int new_nkeys = new_max_nkeys;
+
+  char* new_n_ksuf_pos = new_n_ksuf;
+  char* n_ksuf_pos = n_ksuf;
+
+  int copy_ksuf_len = 0;
+
+  int start_task_pos = task_.size();
+
+  while (!m_inserted && (n_pos < n_nkeys)) {
+    //if deleted
+    if (n_ikeylen[n_pos] == 0) {
+      //std::cout << "item deleted; m_inserted = " << m_inserted << ", n_pos = " << n_pos << "\n";
+      n_ksuf_pos += (n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos]);
+      n_pos++;
+      new_nkeys--;
+    }
+    else {
+      uint8_t m_ikey_length = m_->keylenx_ikeylen(t.ikeylen_m);
+      uint8_t n_ikey_length = n_->keylenx_ikeylen(n_ikeylen[n_pos]);
+      if (t.ikey_m < n_ikey[n_pos]
+	  || ((t.ikey_m == n_ikey[n_pos]) && (m_ikey_length < n_ikey_length))) { 
+	//std::cout << "item_m inserted; m_inserted = " << m_inserted << ", n_pos = " << n_pos << "\n";
+	//move item m to the new array
+	new_n_ikeylen[new_n_pos] = t.ikeylen_m;
+	new_n_ikey[new_n_pos] = t.ikey_m;
+	new_n_lv[new_n_pos] = t.lv_m;
+
+	copy_ksuf_len = t.ksuf_len_m;
+	new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+	if (copy_ksuf_len < 0) {
+	  std::cout << "ERROR: add_item_to_node1(dynamicvalue), COPY_LENGTH < 0!!!\n";
+	  return false;
+	}
+
+	if (copy_ksuf_len > 0)
+	  memcpy(new_n_ksuf_pos, t.ksuf_m, copy_ksuf_len);
+
+	new_n_pos++;
+	m_inserted = true;
+	new_n_ksuf_pos += copy_ksuf_len;
+      }
+      else if (t.ikey_m > n_ikey[n_pos]
+	       || ((t.ikey_m == n_ikey[n_pos]) && (m_ikey_length > n_ikey_length))) { 
+	//std::cout << "item_n inserted, m_inserted = " << m_inserted << ", n_pos = " << n_pos << "\n";
+	//move an item from n to the new array
+	new_n_ikeylen[new_n_pos] = n_ikeylen[n_pos];
+	new_n_ikey[new_n_pos] = n_ikey[n_pos];
+	new_n_lv[new_n_pos] = n_lv[n_pos];
+
+	copy_ksuf_len = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+	new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+	if (copy_ksuf_len < 0) {
+	  std::cout << "n_ksuf_offset[" << (n_pos + 1) << "] = " << n_ksuf_offset[n_pos + 1] << "\n";
+	  std::cout << "n_ksuf_offset[" << n_pos << "] = " << n_ksuf_offset[n_pos] << "\n";
+	  std::cout << "ERROR: add_item_to_node2(dynamicvalue), COPY_LENGTH < 0!!!\n";
+	  return false;
+	}
+
+	if (copy_ksuf_len > 0)
+	  memmove(new_n_ksuf_pos, n_ksuf_pos, copy_ksuf_len);
+
+	new_n_pos++;
+	n_pos++;
+	new_n_ksuf_pos += copy_ksuf_len;
+	n_ksuf_pos += copy_ksuf_len;
+      }
+      else { //same keyslice, same ikey length
+	if (n_->keylenx_is_layer(n_ikeylen[n_pos])) {
+	  //std::cout << "n layer; m_inserted = " << m_inserted << ", n_pos = " << n_pos << "\n";
+	  //if n_pos is layer
+	  new_n_ikeylen[new_n_pos] = n_ikeylen[n_pos];
+	  new_n_ikey[new_n_pos] = n_ikey[n_pos];
+	  //lv TBD
+	  new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+	  merge_task_dynamicvalue tt;
+	  tt.task = 1; //merge item m to n
+	  tt.parent_node = n_;
+	  tt.parent_node_pos = new_n_pos;
+	  tt.n = static_cast<massnode_dynamicvalue<P>*>(n_lv[n_pos].layer());
+
+	  tt.lv_m = t.lv_m;
+
+	  tt.ksuf_len_m = t.ksuf_len_m;
+	  //assign next layer ikeylen
+	  tt.ikeylen_m = convert_to_ikeylen(tt.ksuf_len_m);
+	  //make next layer ikey
+	  tt.ikey_m = string_slice<ikey_type>::make_comparable_sloppy(t.ksuf_m, tt.ksuf_len_m);
+
+	  //make next layer suffix
+	  if (tt.ksuf_len_m > sizeof(ikey_type)) {
+	    tt.ksuf_len_m -= sizeof(ikey_type);
+	    tt.ksuf_m = (char*)malloc(tt.ksuf_len_m + 1);
+	    memcpy((void*)tt.ksuf_m, (const void*)(t.ksuf_m + sizeof(ikey_type)), tt.ksuf_len_m);
+	  }
+	  else {
+	    tt.ksuf_m = 0;
+	    tt.ksuf_len_m = 0;
+	  }
+
+	  task_.push_back(tt);
+	}
+	else {
+	  //std::cout << "both NOT layer; m_inserted = " << m_inserted << ", n_pos = " << n_pos << "\n";
+	  //if n_pos is NOT layer
+	  //values
+	  int ksuflen_m = t.ksuf_len_m;
+	  int ksuflen_n = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+	  if ((ksuflen_m == 0) && (ksuflen_n == 0)) {
+	    std::cout << "Error3: same key!\n";
+	    return false;
+	  }
+	  else if ((ksuflen_m == ksuflen_n) 
+		   && (strncmp(t.ksuf_m, n_ksuf_pos, ksuflen_m) == 0)) {
+	    std::cout << "Error4: same key!\n";
+	    return false;
+	  }
+	  else {
+	    //std::cout << "both NOT layer 3; m_inserted = " << m_inserted << ", n_pos = " << n_pos << "\n";
+	    new_n_ikeylen[new_n_pos] = (uint8_t)(n_ikeylen[n_pos] + (uint8_t)64);
+	    new_n_ikey[new_n_pos] = n_ikey[n_pos];
+	    //lv TBD
+	    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+	    merge_task_dynamicvalue tt;
+	    tt.task = 2; //create a new node to include m and n
+	    tt.parent_node = n_;
+	    tt.parent_node_pos = new_n_pos;
+
+	    tt.lv_m = t.lv_m;
+
+	    tt.ksuf_len_m = t.ksuf_len_m;
+	    //assign m next layer ikeylen
+	    tt.ikeylen_m = convert_to_ikeylen(tt.ksuf_len_m);
+	    //make m next layer ikey
+	    tt.ikey_m = string_slice<ikey_type>::make_comparable_sloppy(t.ksuf_m, tt.ksuf_len_m);
+	    
+	    //make m next layer suffix
+	    if (tt.ksuf_len_m > sizeof(ikey_type)) {
+	      tt.ksuf_len_m -= sizeof(ikey_type);
+	      tt.ksuf_m = (char*)malloc(tt.ksuf_len_m + 1);
+	      memcpy((void*)tt.ksuf_m, (const void*)(t.ksuf_m + sizeof(ikey_type)), tt.ksuf_len_m);
+	    }
+	    else {
+	      tt.ksuf_m = 0;
+	      tt.ksuf_len_m = 0;
+	    }
+
+
+	    tt.lv_n = n_lv[n_pos];
+	    tt.ksuf_len_n = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+	    //assign n next layer ikeylen
+	    tt.ikeylen_n = convert_to_ikeylen(tt.ksuf_len_n);
+	    //make n next layer ikey
+	    tt.ikey_n = string_slice<ikey_type>::make_comparable_sloppy(n_ksuf_pos, tt.ksuf_len_n);
+	    
+	    //make n next layer suffix
+	    if (tt.ksuf_len_n > sizeof(ikey_type)) {
+	      tt.ksuf_len_n -= sizeof(ikey_type);
+	      tt.ksuf_n = (char*)malloc(tt.ksuf_len_n + 1);
+	      memcpy((void*)tt.ksuf_n, (const void*)(n_ksuf_pos + sizeof(ikey_type)), tt.ksuf_len_n);
+	    }
+	    else {
+	      tt.ksuf_n = 0;
+	      tt.ksuf_len_n = 0;
+	    }
+
+	    task_.push_back(tt);
+	    n_ksuf_pos += (n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos]);
+	  }
+	}
+
+	new_nkeys--;
+	new_n_pos++;
+	m_inserted = true;
+	n_pos++;
+      } //same keyslice, same key length else end
+    } //else end
+  } //while end
+
+  //if item m has not been inserted, insert it now
+  if (!m_inserted) {
+    //std::cout << "m leftovers; m_inserted = " << m_inserted <<"\n";
+    new_n_ikeylen[new_n_pos] = t.ikeylen_m;
+    new_n_ikey[new_n_pos] = t.ikey_m;
+    new_n_lv[new_n_pos] = t.lv_m;
+
+    copy_ksuf_len = t.ksuf_len_m;
+    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+    if (copy_ksuf_len < 0) {
+      std::cout << "ERROR: add_item_to_node3(dynamicvalue), COPY_LENGTH < 0!!!\n";
+      return false;
+    }
+
+    if (copy_ksuf_len > 0)
+      memcpy(new_n_ksuf_pos, t.ksuf_m, copy_ksuf_len);
+    
+    new_n_pos++;
+    m_inserted = true;
+    new_n_ksuf_pos += copy_ksuf_len;
+  }
+
+  //if n has leftovers, shift them to the new positions
+  while (n_pos < n_nkeys) {
+    //std::cout << "n leftovers; n_pos = " << n_pos << "\n";
+    new_n_ikeylen[new_n_pos] = n_ikeylen[n_pos];
+    new_n_ikey[new_n_pos] = n_ikey[n_pos];
+    new_n_lv[new_n_pos] = n_lv[n_pos];
+
+    copy_ksuf_len = n_ksuf_offset[n_pos + 1] - n_ksuf_offset[n_pos];
+    new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+    if (copy_ksuf_len < 0) {
+      std::cout << "ERROR: add_item_to_node4(dynamicvalue), COPY_LENGTH < 0!!!\n";
+      return false;
+    }
+
+    if (copy_ksuf_len > 0)
+      memmove(new_n_ksuf_pos, n_ksuf_pos, copy_ksuf_len);
+
+    new_n_pos++;
+    n_pos++;
+    new_n_ksuf_pos += copy_ksuf_len;
+    n_ksuf_pos += copy_ksuf_len;
+  }
+
+  //fill in the last ksuf_offset position
+  new_n_ksuf_offset[new_n_pos] = (uint32_t)(new_n_ksuf_pos - new_n_ksuf);
+
+  //delete m
+  if (t.ksuf_len_m != 0)
+    free(t.ksuf_m);
+
+  //compact n if needed
+  int new_ikeylen_size = (int)(sizeof(uint8_t) * new_nkeys);
+  int new_ikey_size = (int)(sizeof(ikey_type) * new_nkeys);
+  int new_lv_size = (int)(sizeof(leafvalue<P>) * new_nkeys);
+  int new_ksuf_offset_size = (int)(sizeof(uint32_t) * (new_nkeys + 1));
+  int new_ksuf_size = new_n_ksuf_offset[new_n_pos];
+
+  int new_size = (int)(sizeof(massnode_dynamicvalue<P>)
+		       + new_ikeylen_size
+		       + new_ikey_size
+		       + new_lv_size
+		       + new_ksuf_offset_size
+		       + new_ksuf_size);
+
+  if (new_nkeys < new_max_nkeys) {
+    uint8_t* final_n_ikeylen = (uint8_t*)((char*)n_ + sizeof(massnode_dynamicvalue<P>));
+    ikey_type* final_n_ikey = (ikey_type*)((char*)n_ + sizeof(massnode_dynamicvalue<P>)
+					   + new_ikeylen_size);
+    leafvalue<P>* final_n_lv 
+      = (leafvalue<P>*)((char*)n_ + sizeof(massnode_dynamicvalue<P>)
+					  + new_ikeylen_size
+					  + new_ikey_size);
+    uint32_t* final_n_ksuf_offset = (uint32_t*)((char*)n_ + sizeof(massnode_dynamicvalue<P>)
+						+ new_ikeylen_size
+						+ new_ikey_size
+						+ new_lv_size);
+    char* final_n_ksuf = (char*)((char*)n_ + sizeof(massnode_dynamicvalue<P>)
+				 + new_ikeylen_size
+				 + new_ikey_size
+				 + new_lv_size
+				 + new_ksuf_offset_size);
+
+
+    memmove((void*)final_n_ikey, (const void*)new_n_ikey, new_ikey_size);
+    memmove((void*)final_n_lv, (const void*)new_n_lv, new_lv_size);
+    memmove((void*)final_n_ksuf_offset, (const void*)new_n_ksuf_offset, new_ksuf_offset_size);
+    memmove((void*)final_n_ksuf, (const void*)new_n_ksuf, new_ksuf_size);
+
+    //resize(shrink) n
+    n_ = n_->resize((size_t)new_size, ti);
+
+    //resize may change the address, update the parent nodes addr in task_
+    if (start_task_pos < task_.size()) //this costs 6 hours
+      task_[task_.size() - 1].parent_node = n_;
+  }
+
+  n_->set_size((uint32_t)new_nkeys);
+  n_->set_allocated_size((uint32_t)new_size);
+
+  if (t.parent_node == NULL) {
+    std::cout << "ERROR: add_item_to_node(dynamicvalue), parent_node is NULL!!!\n";
+    return false;
+  }
+
+  t.parent_node->set_lv(t.parent_node_pos, leafvalue<P>(static_cast<node_base<P>*>(n_)));
+
+  return true;
+}
+
+//huanchen-static-merge-dynamicvalue
+//**********************************************************************************
+// stcursor_merge_dynamicvalue::create_node
+//**********************************************************************************
+template <typename P>
+bool stcursor_merge_dynamicvalue<P>::create_node(merge_task_dynamicvalue t, threadinfo &ti) {
+  //std::cout << "create_node(dynamicvalue) start$$$$$$$$$$\n";
+
+  size_t ksufSize = 0;
+  uint32_t nkeys = 0;
+
+  if ((t.ikey_m == t.ikey_n) && (t.ikeylen_m == t.ikeylen_n)) {
+    ksufSize = 0;
+    nkeys = 1;
+    n_ = massnode_dynamicvalue<P>::make(ksufSize, nkeys, ti); //values
+    n_->set_ikeylen(0, (uint8_t)(t.ikeylen_n + (uint8_t)64));
+    n_->set_ikey(0, t.ikey_n);
+    //lv TBD
+    n_->set_ksuf_offset(0, (uint32_t)0);
+    n_->set_ksuf_offset(1, (uint32_t)0);
+
+    merge_task_dynamicvalue tt;
+    tt.task = 2; //create a new node to include m and n
+    tt.parent_node = n_;
+    tt.parent_node_pos = 0;
+
+    tt.lv_m = t.lv_m;
+    tt.ksuf_len_m = t.ksuf_len_m;
+    //assign m next layer ikeylen
+    tt.ikeylen_m = convert_to_ikeylen(tt.ksuf_len_m);
+    //make m next layer ikey
+    tt.ikey_m = string_slice<ikey_type>::make_comparable_sloppy(t.ksuf_m, tt.ksuf_len_m);
+
+    //make m next layer suffix
+    if (tt.ksuf_len_m > sizeof(ikey_type)) {
+      tt.ksuf_len_m -= sizeof(ikey_type);
+      tt.ksuf_m = (char*)malloc(tt.ksuf_len_m + 1);
+      memcpy((void*)tt.ksuf_m, (const void*)(t.ksuf_m + sizeof(ikey_type)), tt.ksuf_len_m);
+    }
+    else {
+      tt.ksuf_m = 0;
+      tt.ksuf_len_m = 0;
+    }
+
+    tt.lv_n = t.lv_n;
+    tt.ksuf_len_n = t.ksuf_len_n;
+    //assign m next layer ikeylen
+    tt.ikeylen_n = convert_to_ikeylen(tt.ksuf_len_n);
+    //make m next layer ikey
+    tt.ikey_n = string_slice<ikey_type>::make_comparable_sloppy(t.ksuf_n, tt.ksuf_len_n);
+
+    //make m next layer suffix
+    if (tt.ksuf_len_n > sizeof(ikey_type)) {
+      tt.ksuf_len_n -= sizeof(ikey_type);
+      tt.ksuf_n = (char*)malloc(tt.ksuf_len_n + 1);
+      memcpy((void*)tt.ksuf_n, (const void*)(t.ksuf_n + sizeof(ikey_type)), tt.ksuf_len_n);
+    }
+    else {
+      tt.ksuf_n = 0;
+      tt.ksuf_len_n = 0;
+    }
+
+    task_.push_back(tt);
+  }
+  else {
+    ksufSize = t.ksuf_len_m + t.ksuf_len_n;
+    nkeys = 2;
+    n_ = massnode_dynamicvalue<P>::make(ksufSize, nkeys, ti);
+
+    if ((t.ikey_m < t.ikey_n)
+	|| ((t.ikey_m == t.ikey_n) && (t.ikeylen_m < t.ikeylen_n))) {
+      n_->set_ikeylen(0, t.ikeylen_m);
+      n_->set_ikey(0, t.ikey_m);
+      n_->set_lv(0, t.lv_m);
+      n_->set_ksuf_offset(0, (uint32_t)0);
+      n_->set_ksuf_offset(1, (uint32_t)t.ksuf_len_m);
+
+      n_->set_ikeylen(1, t.ikeylen_n);
+      n_->set_ikey(1, t.ikey_n);
+      n_->set_lv(1, t.lv_n);
+
+      n_->set_ksuf_offset(2, (uint32_t)(t.ksuf_len_m + t.ksuf_len_n));
+
+      if ((t.ksuf_len_m < 0) || (t.ksuf_len_n) < 0) {
+	std::cout << "ERROR: (dynamicvalue) ksuf copy length < 0!!!\n";
+	return false;
+      }
+
+      if (t.ksuf_len_m > 0)
+	memcpy((void*)(n_->ksufpos(0)), (const void*)t.ksuf_m, t.ksuf_len_m);
+      if (t.ksuf_len_n > 0)
+	memcpy((void*)(n_->ksufpos(1)), (const void*)t.ksuf_n, t.ksuf_len_n);
+    }
+    else {
+      n_->set_ikeylen(0, t.ikeylen_n);
+      n_->set_ikey(0, t.ikey_n);
+      n_->set_lv(0, t.lv_n); //values
+      n_->set_ksuf_offset(0, (uint32_t)0);
+      n_->set_ksuf_offset(1, (uint32_t)t.ksuf_len_n);
+
+      n_->set_ikeylen(1, t.ikeylen_m);
+      n_->set_ikey(1, t.ikey_m);
+      n_->set_lv(1, t.lv_m); //values
+      n_->set_ksuf_offset(2, (uint32_t)(t.ksuf_len_n + t.ksuf_len_m));
+
+      if ((t.ksuf_len_m < 0) || (t.ksuf_len_n) < 0) {
+	std::cout << "ERROR: (dynamicvalue) ksuf copy length < 0!!!\n";
+	return false;
+      }
+
+      if (t.ksuf_len_n > 0)
+	memcpy((void*)(n_->ksufpos(0)), (const void*)t.ksuf_n, t.ksuf_len_n);
+      if (t.ksuf_len_m > 0)
+	memcpy((void*)(n_->ksufpos(1)), (const void*)t.ksuf_m, t.ksuf_len_m);
+    }
+  }
+
+  //delete m
+  if (t.ksuf_len_m != 0)
+    free(t.ksuf_m);
+
+  //delete n
+  if (t.ksuf_len_n != 0)
+    free(t.ksuf_n);
+
+  if (t.parent_node == NULL) {
+    std::cout << "ERROR: create_node(dynamicvalue), parent_node is NULL!!!\n";
+    return false;
+  }
+
+  t.parent_node->set_lv(t.parent_node_pos, leafvalue<P>(static_cast<node_base<P>*>(n_)));
+
+  return true;
+}
+
+//huanchen-static-merge-dynamicvalue
+//**********************************************************************************
+// stcursor_merge_dynamicvalue::merge
+//**********************************************************************************
+template <typename P>
+bool stcursor_merge_dynamicvalue<P>::merge(threadinfo &ti, threadinfo &ti_merge) {
+  merge_task_dynamicvalue t;
+  bool merge_success = true;
+
+  //std::cout << "MERGE START\n";
+  t.task = 0; //merge m to n
+  t.parent_node = NULL;
+  t.m = static_cast<massnode_dynamicvalue<P>*>(merge_root_);
+  t.n = static_cast<massnode_dynamicvalue<P>*>(root_);
+  task_.push_back(t);
+
+  int cur_pos = 0;
+  while (cur_pos < task_.size()) {
+    //if (task_.size() % 10000 == 0)
+    //std::cout << "task_.size() = " << task_.size() << "\n";
+    if (task_[cur_pos].task == 0)
+      merge_success = merge_nodes(task_[cur_pos], ti, ti_merge);
+    else if (task_[cur_pos].task == 1)
+      merge_success = add_item_to_node(task_[cur_pos], ti);
+    else if (task_[cur_pos].task == 2)
+      merge_success = create_node(task_[cur_pos], ti);
+    else
+      return false;
+    cur_pos++;
+    if (!merge_success) {
+      std::cout << "MERGE FAIL!!!\n";
+      return false;
+    }
+  }
+
+  //std::cout << "merge(dynamicvalue) success-----------------------------------------\n";
+  return merge_success;
+}
+
+//huanchen-static-merge-dynamicvalue
+//**********************************************************************************
+// stcursor_merge_dynamicvalue::convert_to_ikeylen
+//**********************************************************************************
+template <typename P>
+inline uint8_t stcursor_merge_dynamicvalue<P>::convert_to_ikeylen(uint32_t len) {
+  uint8_t ikeylen = (uint8_t)0;
+  //if (len >= 8)
+  //ikeylen = (uint8_t)8; 
+  if (len > 8)
+    ikeylen = (uint8_t)9;
+  else if (len == 8)
+    ikeylen = (uint8_t)8;
+  else if (len == 7)
+    ikeylen = (uint8_t)7;
+  else if (len == 6)
+    ikeylen = (uint8_t)6;
+  else if (len == 5)
+    ikeylen = (uint8_t)5;
+  else if (len == 4)
+    ikeylen = (uint8_t)4;
+  else if (len == 3)
+    ikeylen = (uint8_t)3;
+  else if (len == 2)
+    ikeylen = (uint8_t)2;
+  else if (len == 1)
+    ikeylen = (uint8_t)1;
+  else
+    return ikeylen;
+  return ikeylen;
+}
+
+
+
+
+
 //huanchen-stats
 template <typename P>
 void unlocked_tcursor<P>::stats(threadinfo &ti, std::vector<uint32_t> &nkeys_stats) {
-  typedef typename P::ikey_type ikey_type;
+  //typedef typename P::ikey_type ikey_type;
 
   leaf<P> *next;
   node_base<P> *root = const_cast<node_base<P>*> (root_);
