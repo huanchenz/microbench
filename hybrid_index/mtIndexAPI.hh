@@ -58,7 +58,7 @@
 #include "config.h"
 
 #define GC_THRESHOLD 1000000
-#define MERGE 0
+#define MERGE 1
 #define MERGE_THRESHOLD 100
 #define MERGE_RATIO 10
 #define VALUE_LEN 8
@@ -311,9 +311,9 @@ public:
   //Insert Unique
   //#####################################################################################
   inline bool put_uv(const Str &key, const Str &value) {
-    if (sic != 0)
-      if (static_exist(key.s, key.len))
-	return false;
+    //if (sic != 0)
+    //if (static_exist(key.s, key.len))
+    //return false;
     lp_mt_l.setup_cursor(table_->table(), key);
     bool found = lp_mt_l.find_insert(*ti_);
     if (!found)

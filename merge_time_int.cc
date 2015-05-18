@@ -1,12 +1,10 @@
 #include "microbench.hh"
 
 int main(int argc, char *argv[]) {
-  int merge_threshold = atoi(argv[1]);
-  int merge_ratio = atoi(argv[2]);
   std::ifstream infile_load("workloads/loada_zipf_int_100M.dat");
 
   HybridType hybrid;
-  hybrid.setup(false, merge_threshold, merge_ratio);
+  hybrid.setup(KEY_LEN, false);
 
   std::string op;
   uint64_t key;
@@ -32,6 +30,9 @@ int main(int argc, char *argv[]) {
 
   //initial load
   //INSERT ONLY TEST
+  int merge_ratio = 10;
+  int merge_threshold = 100;
+
   int ic = 0;
   int sic = 0;
   count = 0;
